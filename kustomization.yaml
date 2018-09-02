@@ -1,0 +1,7 @@
+commonLabels:
+  app: appdb-operator
+resources:
+- manifests/appdb-operator-rbac.yaml
+- manifests/appdb-operator.yaml
+patches:
+- manifests/dev/image.yaml

@@ -1,0 +1,12 @@
+# Override image for development mode (skaffold fills in the tag).
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: appdb-operator
+  namespace: metacontroller
+spec:
+  template:
+    spec:
+      containers:
+      - name: appdb-operator
+        image: gcr.io/cloud-solutions-group/appdb-operator

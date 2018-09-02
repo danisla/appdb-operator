@@ -1,0 +1,7 @@
+.git/
+charts/
+examples/
+manifests/
+images/
+tests/
+tmp/

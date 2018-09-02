@@ -1,0 +1,151 @@
+### BEGIN AppDBInstance resources ###
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: appdbinstances.ctl.isla.solutions
+spec:
+  group: ctl.isla.solutions
+  version: v1
+  scope: Namespaced
+  names:
+    plural: appdbinstances
+    singular: appdbinstance
+    kind: AppDBInstance
+    shortNames: ["appdbi"]
+---
+apiVersion: metacontroller.k8s.io/v1alpha1
+kind: CompositeController
+metadata:
+  name: appdb-instance-operator
+spec:
+  generateSelector: true
+  resyncPeriodSeconds: 4
+  parentResource:
+    apiVersion: ctl.isla.solutions/v1
+    resource: appdbinstances
+  childResources:
+  - apiVersion: v1
+    resource: services
+  - apiVersion: apps/v1beta1
+    resource: deployments
+  - apiVersion: ctl.isla.solutions/v1
+    resource: terraformapplys
+  hooks:
+    sync:
+      webhook:
+        url: http://appdb-instance-operator.metacontroller/sync
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: appdb-instance-operator
+  namespace: metacontroller
+  labels:
+    app: appdb-instance-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appdb-instance-operator
+  template:
+    metadata:
+      labels:
+        app: appdb-instance-operator
+    spec:
+      serviceAccountName: appdb-operator
+      containers:
+      - name: appdb-operator
+        image: gcr.io/cloud-solutions-group/appdb-operator:latest
+        command: ["/usr/bin/appdb-instance-operator"]
+        # env:
+        # - name: HTTP_DEBUG
+        #   value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appdb-instance-operator
+  namespace: metacontroller
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+  selector:
+    app: appdb-instance-operator
+### END AppDBInstance resources ###
+---
+### BEGIN AppDB resources ###
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: appdbs.ctl.isla.solutions
+spec:
+  group: ctl.isla.solutions
+  version: v1
+  scope: Namespaced
+  names:
+    plural: appdbs
+    singular: appdb
+    kind: AppDB
+    shortNames: ["appdb"]
+---
+apiVersion: metacontroller.k8s.io/v1alpha1
+kind: CompositeController
+metadata:
+  name: appdb-operator
+spec:
+  generateSelector: true
+  resyncPeriodSeconds: 4
+  parentResource:
+    apiVersion: ctl.isla.solutions/v1
+    resource: appdbs
+  childResources:
+  - apiVersion: batch/v1
+    resource: jobs
+  - apiVersion: ctl.isla.solutions/v1
+    resource: terraformapplys
+  hooks:
+    sync:
+      webhook:
+        url: http://appdb-operator.metacontroller/sync
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: appdb-operator
+  namespace: metacontroller
+  labels:
+    app: appdb-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appdb-operator
+  template:
+    metadata:
+      labels:
+        app: appdb-operator
+    spec:
+      serviceAccountName: appdb-operator
+      containers:
+      - name: appdb-operator
+        image: gcr.io/cloud-solutions-group/appdb-operator:latest
+        command: ["/usr/bin/appdb-operator"]
+        # env:
+        # - name: HTTP_DEBUG
+        #   value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appdb-operator
+  namespace: metacontroller
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+  selector:
+    app: appdb-operator
+### END AppDB resources ###

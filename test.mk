@@ -1,4 +1,4 @@
-TEST_CLOUDSQL_ARTIFACTS := db1-cloudsql-appdbinstance.yaml
+TEST_CLOUDSQL_ARTIFACTS := db1-cloudsql-appdbinstance.yaml db1-cloudsql-tfdestroy.yaml
 TEST_APPDB_ARTIFACTS := db1-appdb.yaml
 
 TEST_ARTIFACTS := $(TEST_CLOUDSQL_ARTIFACTS) $(TEST_APPDB_ARTIFACTS)
@@ -10,7 +10,7 @@ project:
 	$(eval PROJECT := $(shell gcloud config get-value project))
 
 backend_bucket: project
-	$(eval BACKEND_BUCKET := $(PROJECT)-terraform-operator)
+	$(eval BACKEND_BUCKET := $(PROJECT)-appdb-operator)
 
 define TEST_CLOUDSQL
 apiVersion: ctl.isla.solutions/v1
@@ -19,14 +19,33 @@ metadata:
   name: {{NAME}}
 spec:
   driver:
-    cloudSQL:
-      region: us-central1
-      database_version: MYSQL_5_6
-      tier: db-f1-micro
-
+    cloudSQLTerraform:
+      params:
+        region: "us-central1"
+        database_version: "MYSQL_5_6"
+        tier: "db-f1-micro"
+        disk_size_gb: "10"
+        disk_type: "PD_SSD"
       proxy:
         image: gcr.io/cloudsql-docker/gce-proxy:1.11
         replicas: 3
+endef
+
+define TEST_CLOUDSQL_DESTROY
+apiVersion: ctl.isla.solutions/v1
+kind: TerraformDestroy
+metadata:
+  name: {{NAME}}
+spec:
+  backendBucket: {{BACKEND_BUCKET}}
+  backendPrefix: {{BACKEND_PREFIX}}
+  providerConfig:
+    google:
+      secretName: {{GOOGLE_PROVIDER_SECRET_NAME}}
+  sources:
+  - tfapply: {{SRC_TFAPPLY}}
+  tfvarsFrom:
+  - tfapply: {{SRC_TFAPPLY}}
 endef
 
 define TEST_APPDB
@@ -54,6 +73,17 @@ tests/db%-cloudsql-appdbinstance.yaml:
 	sed -e "s/{{NAME}}/db$*-cloudsql/g" \
 	> $@
 
+export TEST_CLOUDSQL_DESTROY
+tests/db%-cloudsql-tfdestroy.yaml: backend_bucket
+	@mkdir -p tests
+	@echo "$${TEST_CLOUDSQL_DESTROY}" | \
+	sed -e "s/{{NAME}}/db$*-cloudsql/g" \
+	    -e "s/{{SRC_TFAPPLY}}/db$*-cloudsql/g" \
+      -e "s/{{BACKEND_BUCKET}}/$(BACKEND_BUCKET)/g" \
+	    -e "s/{{BACKEND_PREFIX}}/terraform/g" \
+	    -e "s/{{GOOGLE_PROVIDER_SECRET_NAME}}/$(GOOGLE_PROVIDER_SECRET_NAME)/g" \
+	>$@
+
 export TEST_APPDB
 tests/db%-appdb.yaml:
 	@mkdir -p tests
@@ -63,6 +93,7 @@ tests/db%-appdb.yaml:
 	    -e "s/{{RW_USER}}/db$*-writer/g" \
 	    -e "s/{{RO_USER}}/db$*-reader/g" \
 	> $@
+
 
 ### END Tests with CloudSQL instance ###
 

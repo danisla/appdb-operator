@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	config Config
+	config               Config
+	cloudSQLDriverconfig CloudSQLDriverConfig
 )
 
 func init() {
@@ -23,6 +24,12 @@ func init() {
 
 	if err := config.loadAndValidate(); err != nil {
 		log.Fatalf("Error loading config: %v", err)
+	}
+
+	cloudSQLDriverconfig = CloudSQLDriverConfig{}
+
+	if err := cloudSQLDriverconfig.loadAndValidate(); err != nil {
+		log.Fatalf("Failed to load cloudsql driver config: %v", err)
 	}
 }
 
@@ -35,7 +42,7 @@ func main() {
 	http.HandleFunc("/", webhookHandler())
 
 	log.Printf("[INFO] Initialized controller on port 80\n")
-	log.Fatal(http.ListenAndServe(":80", nil))
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func healthzHandler() func(w http.ResponseWriter, r *http.Request) {

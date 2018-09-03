@@ -34,45 +34,6 @@ spec:
     sync:
       webhook:
         url: http://appdb-instance-operator.metacontroller/sync
----
-apiVersion: apps/v1beta1
-kind: Deployment
-metadata:
-  name: appdb-instance-operator
-  namespace: metacontroller
-  labels:
-    app: appdb-instance-operator
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: appdb-instance-operator
-  template:
-    metadata:
-      labels:
-        app: appdb-instance-operator
-    spec:
-      serviceAccountName: appdb-operator
-      containers:
-      - name: appdb-operator
-        image: gcr.io/cloud-solutions-group/appdb-operator:latest
-        command: ["/usr/bin/appdb-instance-operator"]
-        # env:
-        # - name: HTTP_DEBUG
-        #   value: "true"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: appdb-instance-operator
-  namespace: metacontroller
-spec:
-  type: ClusterIP
-  ports:
-  - name: http
-    port: 80
-  selector:
-    app: appdb-instance-operator
 ### END AppDBInstance resources ###
 ---
 ### BEGIN AppDB resources ###
@@ -129,12 +90,31 @@ spec:
     spec:
       serviceAccountName: appdb-operator
       containers:
+      - name: appdb-instance-operator
+        image: gcr.io/cloud-solutions-group/appdb-operator:latest
+        imagePullPolicy: Always
+        command: ["/usr/bin/appdb-instance-operator"]
       - name: appdb-operator
         image: gcr.io/cloud-solutions-group/appdb-operator:latest
+        imagePullPolicy: Always
         command: ["/usr/bin/appdb-operator"]
         # env:
         # - name: HTTP_DEBUG
         #   value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appdb-instance-operator
+  namespace: metacontroller
+spec:
+  type: ClusterIP
+  ports:
+  - name: appdb
+    port: 80
+    targetPort: 8080
+  selector:
+    app: appdb-operator
 ---
 apiVersion: v1
 kind: Service
@@ -144,8 +124,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - name: http
+  - name: appdb
     port: 80
+    targetPort: 8081
   selector:
     app: appdb-operator
 ### END AppDB resources ###

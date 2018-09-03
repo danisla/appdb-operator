@@ -30,6 +30,10 @@ func makeStatus(parent *appdbv1.AppDBInstance, children *AppDBInstanceChildren) 
 		status.StateCurrent = parent.Status.StateCurrent
 	}
 
+	if parent.Status.CloudSQL != nil && changed == false {
+		status.CloudSQL = parent.Status.CloudSQL
+	}
+
 	return &status
 }
 

@@ -60,13 +60,19 @@ If developing for a database instance that uses Terraform, install the [terrafor
 make install-terraform-operator
 ```
 
-5. Install go dependencies:
+5. Install provider credentials:
+
+```
+make -e GOOGLE_CREDENTIALS_SA_KEY=~/.tf-google-sa-key.json credentials
+```
+
+6. Install go dependencies:
 
 ```
 dep ensure
 ```
 
-6. Run in cluster with skaffold:
+7. Run in cluster with skaffold:
 
 ```
 skaffold dev

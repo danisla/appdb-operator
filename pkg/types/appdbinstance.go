@@ -5,8 +5,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// AppDBInstanceOperatorState represents the string mapping of the possible controller states. See the const definition below for enumerated states.
+// AppDBInstanceOperatorState represents the string mapping of the possible controller states.
 type AppDBInstanceOperatorState string
+
+// ProvisioningStatus represents the string mapping to the possible status.Provisioning values. See the const definition below for enumerated states.
+type ProvisioningStatus string
+
+const (
+	ProvisioningStatusPending  = "PENDING"
+	ProvisioningStatusFailed   = "FAILED"
+	ProvisioningStatusComplete = "COMPLETE"
+)
 
 // AppDBInstance is the custom resource definition structure.
 type AppDBInstance struct {
@@ -18,8 +27,16 @@ type AppDBInstance struct {
 
 // AppDBInstanceOperatorStatus is the status structure for the custom resource
 type AppDBInstanceOperatorStatus struct {
-	LastAppliedSig string                     `json:"lastAppliedSig"`
-	StateCurrent   AppDBInstanceOperatorState `json:"stateCurrent"`
+	LastAppliedSig string                       `json:"lastAppliedSig"`
+	StateCurrent   AppDBInstanceOperatorState   `json:"stateCurrent"`
+	Provisioning   string                       `json:"provisioning"`
+	CloudSQL       *AppDBInstanceCloudSQLStatus `json:"cloudSQL"`
+}
+
+// AppDBInstanceCloudSQLStatus is the status structure for the CloudSQL driver
+type AppDBInstanceCloudSQLStatus struct {
+	TFApplyName    string
+	TFApplyPodName string
 }
 
 // AppDBInstanceSpec is the top level structure of the spec body
@@ -29,15 +46,13 @@ type AppDBInstanceSpec struct {
 
 // AppDBDriver is the spec of the driver
 type AppDBDriver struct {
-	CloudSQL AppDBCloudSQLDriver `json:"cloudSQL,omitempty"`
+	CloudSQLTerraform *AppDBCloudSQLTerraformDriver `json:"cloudSQLTerraform,omitempty"`
 }
 
 // AppDBCloudSQLDriver is the CloudSQL driver spec
-type AppDBCloudSQLDriver struct {
-	Region          string            `json:"region,omitempty"`
-	DatabaseVersion string            `json:"databaseVersion,omitempty"`
-	Tier            string            `json:"tier,omitempty"`
-	Proxy           CloudSQLProxySpec `json:"proxy,omitempty"`
+type AppDBCloudSQLTerraformDriver struct {
+	Params map[string]string `json:"params,omitempty"`
+	Proxy  CloudSQLProxySpec `json:"proxy,omitempty"`
 }
 
 // CloudSQLProxySpec is the spec for a cloudsql proxy

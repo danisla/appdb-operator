@@ -35,7 +35,7 @@ func main() {
 	http.HandleFunc("/", webhookHandler())
 
 	log.Printf("[INFO] Initialized controller on port 80\n")
-	log.Fatal(http.ListenAndServe(":80", nil))
+	log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
 func healthzHandler() func(w http.ResponseWriter, r *http.Request) {

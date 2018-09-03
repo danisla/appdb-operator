@@ -17,6 +17,8 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 	case StateNone, StateIdle:
 		nextState, err = stateIdle(parentType, parent, status, children, &desiredChildren)
 
+	case StateCloudSQLPending:
+		nextState, err = stateCloudSQLRunning(parentType, parent, status, children)
 	}
 
 	if err != nil {

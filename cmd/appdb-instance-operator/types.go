@@ -12,6 +12,8 @@ const (
 	StateNone = appdbv1.AppDBInstanceOperatorState("NONE")
 	// StateIdle means there are no more changes pending
 	StateIdle = appdbv1.AppDBInstanceOperatorState("IDLE")
+	// StateWaitComplete is used to indicate that a wait is complete and to transition back through the idle handler.
+	StateWaitComplete = appdbv1.AppDBInstanceOperatorState("WAIT_COMPLETE")
 	// StateCLoudSQLPending means control loop is waiting for Cloud SQL driver to finish provisioning database instance.func Benchmark(b *testing.B) {
 	StateCloudSQLPending = appdbv1.AppDBInstanceOperatorState("CLOUDSQL_PENDING")
 )

@@ -35,6 +35,7 @@ type AppDBInstanceOperatorStatus struct {
 
 // AppDBInstanceCloudSQLStatus is the status structure for the CloudSQL driver
 type AppDBInstanceCloudSQLStatus struct {
+	InstanceName   string
 	TFApplyName    string
 	TFApplyPodName string
 }

@@ -35,6 +35,10 @@ const (
 	StateNone = appdbv1.AppDBOperatorState("NONE")
 	// StateIdle means there are no more changes pending
 	StateIdle = appdbv1.AppDBOperatorState("IDLE")
+	// StateWaitComplete is used to indicate that a wait is complete and to transition back through the idle handler.
+	StateWaitComplete = appdbv1.AppDBOperatorState("WAIT_COMPLETE")
+	// StateAppDBInstancePending means the controller is waiting for the AppDBInstance to become available.
+	StateAppDBInstancePending = appdbv1.AppDBOperatorState("APPDB_INSTANCE_WAITING")
 )
 
 // ParentType represents the strign mapping to the possible parent types in the const below.

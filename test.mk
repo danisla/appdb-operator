@@ -1,5 +1,5 @@
 TEST_CLOUDSQL_ARTIFACTS := db1-cloudsql-appdbinstance.yaml db1-cloudsql-tfdestroy.yaml
-TEST_APPDB_ARTIFACTS := db1-appdb.yaml
+TEST_APPDB_ARTIFACTS := db1-app1-appdb.yaml
 
 TEST_ARTIFACTS := $(TEST_CLOUDSQL_ARTIFACTS) $(TEST_APPDB_ARTIFACTS)
 
@@ -55,6 +55,7 @@ metadata:
   name: {{NAME}}
 spec:
   appDBInstance: {{APPDB_INSTANCE}}
+  dropOnCreate: true
   users:
     rw:
     - {{RW_USER}}
@@ -85,15 +86,14 @@ tests/db%-cloudsql-tfdestroy.yaml: backend_bucket
 	>$@
 
 export TEST_APPDB
-tests/db%-appdb.yaml:
+tests/db1-app%-appdb.yaml:
 	@mkdir -p tests
 	@echo "$${TEST_APPDB}" | \
-	sed -e "s/{{NAME}}/db$*/g" \
-	    -e "s/{{APPDB_INSTANCE}}/job$*-cloudsql/g" \
-	    -e "s/{{RW_USER}}/db$*-writer/g" \
-	    -e "s/{{RO_USER}}/db$*-reader/g" \
+	sed -e "s/{{NAME}}/app$*/g" \
+	    -e "s/{{APPDB_INSTANCE}}/db1-cloudsql/g" \
+	    -e "s/{{RW_USER}}/app$*-writer/g" \
+	    -e "s/{{RO_USER}}/app$*-reader/g" \
 	> $@
-
 
 ### END Tests with CloudSQL instance ###
 

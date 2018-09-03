@@ -142,6 +142,9 @@ func getCloudSQLTerraformManifest(srcPath string) (string, error) {
 
 func makeTFVars(name string, cfg *appdbv1.AppDBCloudSQLTerraformDriver) (map[string]string, error) {
 	var tfvars = make(map[string]string, 0)
+
+	// Names must be unique and cannot be reused across destroys.
+	// the Terraform source will create a new name using this as a prefix.
 	tfvars["name"] = name
 
 	// Marshal params to json and unmarshal as tfvars

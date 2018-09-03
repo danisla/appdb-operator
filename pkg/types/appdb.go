@@ -23,8 +23,9 @@ type AppDB struct {
 
 // AppDBSpec is the top level structure of the spec body
 type AppDBSpec struct {
-	AppDBInstance string      `json:"appDBInstance,omitempty"`
-	Users         []AppDBUser `json:"users,omitempty"`
+	AppDBInstance string    `json:"appDBInstance,omitempty"`
+	DropOnCreate  bool      `json:"dropOnCreate,omitempty"`
+	Users         AppDBUser `json:"users,omitempty"`
 }
 
 // AppDBUser is the spec element for a user

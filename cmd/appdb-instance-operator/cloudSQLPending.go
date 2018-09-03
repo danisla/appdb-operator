@@ -22,11 +22,17 @@ func stateCloudSQLRunning(parentType ParentType, parent *appdbv1.AppDBInstance, 
 	case "FAILED":
 		myLog(parent, "ERROR", "CloudSQL TerraformApply failed.")
 		status.Provisioning = appdbv1.ProvisioningStatusFailed
-		return StateIdle, nil
+		return StateWaitComplete, nil
 	case "COMPLETED":
 		myLog(parent, "INFO", "CloudSQL TerraformApply completed.")
 		status.Provisioning = appdbv1.ProvisioningStatusComplete
-		return StateIdle, nil
+		if nameVar, ok := tfapply.Status.TFOutput["name"]; ok == false {
+			return StateCloudSQLPending, fmt.Errorf("Output variable 'name' not found in TerraformApply status")
+		} else {
+			status.CloudSQL.InstanceName = nameVar.Value
+		}
+
+		return StateWaitComplete, nil
 	}
 
 	return StateCloudSQLPending, nil

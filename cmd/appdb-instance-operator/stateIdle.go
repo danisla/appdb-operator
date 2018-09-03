@@ -13,24 +13,29 @@ func stateIdle(parentType ParentType, parent *appdbv1.AppDBInstance, status *app
 		return StateIdle, nil
 	}
 
+	// Create instance using CloudSQLTerraform driver.
+	// When complete, the driver is expected to set status.Provisioning to COMPLETE or FAILED.
 	if parent.Spec.Driver.CloudSQLTerraform != nil {
-		myLog(parent, "INFO", "Database driver is Cloud SQL")
+		if status.StateCurrent != StateWaitComplete {
+			// Create new instance.
+			myLog(parent, "INFO", "Database driver is Cloud SQL")
 
-		tfapply, err := makeCloudSQLTerraform(parent.Name, parent.ObjectMeta.Namespace, parent.Spec.Driver.CloudSQLTerraform)
-		if err != nil {
-			myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
-			return StateIdle, nil
+			tfapply, err := makeCloudSQLTerraform(parent.Name, parent.ObjectMeta.Namespace, parent.Spec.Driver.CloudSQLTerraform)
+			if err != nil {
+				myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
+				return StateIdle, nil
+			}
+
+			*desiredChildren = append(*desiredChildren, tfapply)
+
+			myLog(parent, "INFO", fmt.Sprintf("Created CloudSQL TerraformApply : %s", parent.Name))
+
+			status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
+				TFApplyName: parent.Name,
+			}
+
+			return StateCloudSQLPending, err
 		}
-
-		*desiredChildren = append(*desiredChildren, tfapply)
-
-		myLog(parent, "INFO", fmt.Sprintf("Created CloudSQL TerraformApply : %s", parent.Name))
-
-		status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
-			TFApplyName: parent.Name,
-		}
-
-		return StateCloudSQLPending, err
 
 	} else {
 		myLog(parent, "ERROR", "Unsupported driver")

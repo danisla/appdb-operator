@@ -8,12 +8,13 @@ import (
 	"net/http/httputil"
 	"os"
 
+	tfdriverv1 "github.com/danisla/appdb-operator/pkg/tfdriver"
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 )
 
 var (
-	config               Config
-	cloudSQLDriverconfig CloudSQLDriverConfig
+	config         Config
+	tfDriverConfig tfdriverv1.TerraformDriverConfig
 )
 
 func init() {
@@ -26,10 +27,10 @@ func init() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	cloudSQLDriverconfig = CloudSQLDriverConfig{}
+	tfDriverConfig = tfdriverv1.TerraformDriverConfig{}
 
-	if err := cloudSQLDriverconfig.loadAndValidate(); err != nil {
-		log.Fatalf("Failed to load cloudsql driver config: %v", err)
+	if err := tfDriverConfig.LoadAndValidate(config.Project); err != nil {
+		log.Fatalf("Failed to load terraform driver config: %v", err)
 	}
 }
 

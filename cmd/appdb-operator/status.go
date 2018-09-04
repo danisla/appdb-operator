@@ -12,6 +12,7 @@ import (
 func makeStatus(parent *appdbv1.AppDB, children *AppDBChildren) *appdbv1.AppDBOperatorStatus {
 	status := appdbv1.AppDBOperatorStatus{
 		StateCurrent: StateNone,
+		CloudSQLDB:   &appdbv1.AppDBCloudSQLDBStatus{},
 	}
 
 	changed := false
@@ -28,6 +29,18 @@ func makeStatus(parent *appdbv1.AppDB, children *AppDBChildren) *appdbv1.AppDBOp
 
 	if parent.Status.StateCurrent != "" && changed == false {
 		status.StateCurrent = parent.Status.StateCurrent
+	}
+
+	if parent.Status.CloudSQLDB != nil && changed == false {
+		status.CloudSQLDB = parent.Status.CloudSQLDB
+	}
+
+	if parent.Status.Provisioning != "" && changed == false {
+		status.Provisioning = parent.Status.Provisioning
+	}
+
+	if parent.Status.CredentialsSecret != "" && changed == false {
+		status.CredentialsSecret = parent.Status.CredentialsSecret
 	}
 
 	return &status

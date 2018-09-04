@@ -9,8 +9,17 @@ type AppDBOperatorState string
 
 // AppDBOperatorStatus is the status structure for the custom resource
 type AppDBOperatorStatus struct {
-	LastAppliedSig string             `json:"lastAppliedSig"`
-	StateCurrent   AppDBOperatorState `json:"stateCurrent"`
+	LastAppliedSig    string                 `json:"lastAppliedSig"`
+	StateCurrent      AppDBOperatorState     `json:"stateCurrent"`
+	Provisioning      string                 `json:"provisioning"`
+	CloudSQLDB        *AppDBCloudSQLDBStatus `json:"cloudSQLDB"`
+	CredentialsSecret string                 `json:"credentialsSecret"`
+}
+
+// AppDBCloudSQLDBStatus is the status structure for the CloudSQL driver
+type AppDBCloudSQLDBStatus struct {
+	TFApplyName    string
+	TFApplyPodName string
 }
 
 // AppDB is the custom resource definition structure.
@@ -23,13 +32,7 @@ type AppDB struct {
 
 // AppDBSpec is the top level structure of the spec body
 type AppDBSpec struct {
-	AppDBInstance string    `json:"appDBInstance,omitempty"`
-	DropOnCreate  bool      `json:"dropOnCreate,omitempty"`
-	Users         AppDBUser `json:"users,omitempty"`
-}
-
-// AppDBUser is the spec element for a user
-type AppDBUser struct {
-	RW []string `json:"rw,omitempty"`
-	RO []string `json:"ro,omitempty"`
+	AppDBInstance string   `json:"appDBInstance,omitempty"`
+	DBName        string   `json:"dbName,omitempty"`
+	Users         []string `json:"users,omitempty"`
 }

@@ -12,28 +12,41 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 	desiredChildren := make([]interface{}, 0)
 	nextState := currState[0:1] + currState[1:] // string copy of currState
 
+	// Used to decide when to claim children or when to expect them to be recreated by the state handlers.
+	// changed := changeDetected(parent, children, status)
+
 	var err error
 	switch currState {
+	// case StateIdle:
+	// 	if changed {
+	// 		myLog(parent, "DEBUG", "In StateIdle, changed is true.")
+	// 		nextState, err = stateIdle(parentType, parent, status, children, &desiredChildren)
+	// 	}
+
 	case StateNone, StateIdle, StateWaitComplete:
 		nextState, err = stateIdle(parentType, parent, status, children, &desiredChildren)
 
 	case StateAppDBInstancePending:
 		nextState, err = stateAppDBInstancePending(parentType, parent, status)
 
+	case StateCloudSQLDBPending:
+		nextState, err = stateCloudSQLDBRunning(parentType, parent, status, children, &desiredChildren)
 	}
 
 	if err != nil {
 		return status, &desiredChildren, err
 	}
 
-	// Claim the terraformapplys.
-	for _, o := range children.TerraformApplys {
-		desiredChildren = append(desiredChildren, o)
-	}
+	if status.StateCurrent != StateNone {
+		// Claim the terraformapplys.
+		for _, o := range children.TerraformApplys {
+			desiredChildren = append(desiredChildren, o)
+		}
 
-	// Claim the Jobs.
-	for _, o := range children.Jobs {
-		desiredChildren = append(desiredChildren, o)
+		// Claim the secrets.
+		for _, o := range children.Secrets {
+			desiredChildren = append(desiredChildren, o)
+		}
 	}
 
 	// Advance the state

@@ -22,6 +22,11 @@ func stateCloudSQLRunning(parentType ParentType, parent *appdbv1.AppDBInstance, 
 	case "FAILED":
 		myLog(parent, "ERROR", "CloudSQL TerraformApply failed.")
 		status.Provisioning = appdbv1.ProvisioningStatusFailed
+
+		// Set the parent signature
+		// If parent changes from here on, we'll go back through the idle state, creating new resources.
+		status.LastAppliedSig = calcParentSig(parent, "")
+
 		return StateWaitComplete, nil
 	case "COMPLETED":
 		myLog(parent, "INFO", "CloudSQL TerraformApply completed.")
@@ -31,6 +36,10 @@ func stateCloudSQLRunning(parentType ParentType, parent *appdbv1.AppDBInstance, 
 		} else {
 			status.CloudSQL.InstanceName = nameVar.Value
 		}
+
+		// Set the parent signature
+		// If parent changes from here on, we'll go back through the idle state, creating new resources.
+		status.LastAppliedSig = calcParentSig(parent, "")
 
 		return StateWaitComplete, nil
 	}

@@ -19,17 +19,51 @@ func stateIdle(parentType ParentType, parent *appdbv1.AppDB, status *appdbv1.App
 		return StateIdle, nil
 	}
 
-	appDBInstance, err := getAppDBInstance(parent.ObjectMeta.Namespace, parent.Spec.AppDBInstance)
+	if parent.Spec.DBName == "" {
+		// Must have DBName
+		myLog(parent, "ERROR", "Missing dbName")
+		return StateIdle, nil
+	}
+
+	var appdbi appdbv1.AppDBInstance
+	appdbi, err = getAppDBInstance(parent.ObjectMeta.Namespace, parent.Spec.AppDBInstance)
 	if err != nil {
 		// Wait for AppDBInstance provisioning status to COMPLETE
 		myLog(parent, "INFO", fmt.Sprintf("Waiting for AppDBInstance: %s", parent.Spec.AppDBInstance))
 		return StateAppDBInstancePending, nil
 	}
 
-	myLog(parent, "DEBUG", fmt.Sprintf("AppDBInstance %s is ready", appDBInstance.ObjectMeta.Name))
+	myLog(parent, "DEBUG", fmt.Sprintf("AppDBInstance %s is ready", appdbi.ObjectMeta.Name))
 
-	if appDBInstance.Spec.Driver.CloudSQLTerraform != nil {
-		myLog(parent, "DEBUG", fmt.Sprintf("AppDBInstance %s CloudSQL name: %s", appDBInstance.ObjectMeta.Name, appDBInstance.Status.CloudSQL.InstanceName))
+	if appdbi.Spec.Driver.CloudSQLTerraform != nil {
+		myLog(parent, "DEBUG", fmt.Sprintf("AppDBInstance %s CloudSQL name: %s", appdbi.ObjectMeta.Name, appdbi.Status.CloudSQL.InstanceName))
+	}
+
+	// Terraform driver for CloudSQL database and users
+	if appdbi.Spec.Driver.CloudSQLTerraform != nil {
+		if status.StateCurrent != StateWaitComplete {
+
+			tfApplyName := fmt.Sprintf("%s-%s", appdbi.ObjectMeta.Name, parent.Name)
+
+			// Create new TerraformApply to create DB and users.
+			tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
+			if err != nil {
+				myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL DB: %v", err))
+				return StateIdle, nil
+			}
+
+			*desiredChildren = append(*desiredChildren, tfapply)
+
+			myLog(parent, "INFO", fmt.Sprintf("Created CloudSQL DB TerraformApply: %s", tfapply.ObjectMeta.Name))
+
+			status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
+				TFApplyName: tfapply.ObjectMeta.Name,
+			}
+
+			return StateCloudSQLDBPending, err
+		}
+	} else {
+		myLog(parent, "WARN", "Unsupported AppDBInstance driver")
 	}
 
 	return StateIdle, err

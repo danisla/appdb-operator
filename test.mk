@@ -55,12 +55,9 @@ metadata:
   name: {{NAME}}
 spec:
   appDBInstance: {{APPDB_INSTANCE}}
-  dropOnCreate: true
+  dbName: {{NAME}}
   users:
-    rw:
-    - {{RW_USER}}
-    ro:
-    - {{RO_USER}}
+  - {{DB_USER}}
 endef
 
 credentials: $(GOOGLE_CREDENTIALS_SA_KEY) project
@@ -91,8 +88,7 @@ tests/db1-app%-appdb.yaml:
 	@echo "$${TEST_APPDB}" | \
 	sed -e "s/{{NAME}}/app$*/g" \
 	    -e "s/{{APPDB_INSTANCE}}/db1-cloudsql/g" \
-	    -e "s/{{RW_USER}}/app$*-writer/g" \
-	    -e "s/{{RO_USER}}/app$*-reader/g" \
+	    -e "s/{{DB_USER}}/app$*-dbuser/g" \
 	> $@
 
 ### END Tests with CloudSQL instance ###

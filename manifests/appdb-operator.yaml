@@ -62,8 +62,8 @@ spec:
     apiVersion: ctl.isla.solutions/v1
     resource: appdbs
   childResources:
-  - apiVersion: batch/v1
-    resource: jobs
+  - apiVersion: v1
+    resource: secrets
   - apiVersion: ctl.isla.solutions/v1
     resource: terraformapplys
   hooks:

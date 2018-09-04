@@ -8,11 +8,13 @@ import (
 	"net/http/httputil"
 	"os"
 
+	tfdriverv1 "github.com/danisla/appdb-operator/pkg/tfdriver"
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 )
 
 var (
-	config Config
+	config         Config
+	tfDriverConfig tfdriverv1.TerraformDriverConfig
 )
 
 func init() {
@@ -23,6 +25,12 @@ func init() {
 
 	if err := config.loadAndValidate(); err != nil {
 		log.Fatalf("Error loading config: %v", err)
+	}
+
+	tfDriverConfig = tfdriverv1.TerraformDriverConfig{}
+
+	if err := tfDriverConfig.LoadAndValidate(config.Project); err != nil {
+		log.Fatalf("Failed to load terraform driver config: %v", err)
 	}
 }
 
@@ -93,5 +101,10 @@ func webhookHandler() func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		fmt.Fprintf(w, string(data))
+
+		if os.Getenv("HTTP_DEBUG") != "" {
+			log.Printf("---JSON RESPONSE %s %s ---", r.Method, r.URL.String())
+			log.Printf(string(data))
+		}
 	}
 }

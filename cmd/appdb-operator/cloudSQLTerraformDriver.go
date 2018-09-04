@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 	tfv1 "github.com/danisla/terraform-operator/pkg/types"
@@ -12,31 +12,31 @@ import (
 )
 
 const (
-	DEFAULT_CLOUD_SQL_SOURCE_PATH = "/config/dbinstance/main.tf"
-	DEFAULT_CLOUD_SQL_DISK_TYPE   = "PD_SSD"
+	DEFAULT_CLOUD_SQL_DB_SOURCE_PATH = "/config/db/main.tf"
 )
 
-func makeCloudSQLTerraform(name, namespace string, driver *appdbv1.AppDBCloudSQLTerraformDriver) (tfv1.Terraform, error) {
+func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi appdbv1.AppDBInstance) (tfv1.Terraform, error) {
 	var tfapply tfv1.Terraform
 
-	manifest, err := getCloudSQLTerraformManifest(DEFAULT_CLOUD_SQL_SOURCE_PATH)
+	manifest, err := getCloudSQLTerraformManifest(DEFAULT_CLOUD_SQL_DB_SOURCE_PATH)
 	if err != nil {
-		return tfapply, fmt.Errorf("Error loading cloud sql terraform manifest from %s: %v", DEFAULT_CLOUD_SQL_SOURCE_PATH, err)
+		return tfapply, fmt.Errorf("Error loading cloud sql DB terraform manifest from %s: %v", DEFAULT_CLOUD_SQL_DB_SOURCE_PATH, err)
 	}
 
-	tfvars, err := makeTFVars(name, driver)
+	tfvars, err := makeTFVars(appdbi.Status.CloudSQL.InstanceName, parent.Spec.DBName, parent.Spec.Users)
 	if err != nil {
 		return tfapply, fmt.Errorf("Failed to generate tfvars from driver config: %v", err)
 	}
 
+	// Create new object.
 	tfapply = tfv1.Terraform{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "ctl.isla.solutions/v1",
 			Kind:       "TerraformApply",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      tfApplyName,
+			Namespace: parent.Namespace,
 		},
 		Spec: tfv1.TerraformSpec{
 			Image:           tfDriverConfig.Image,
@@ -72,28 +72,14 @@ func getCloudSQLTerraformManifest(srcPath string) (string, error) {
 	return base64.StdEncoding.EncodeToString(manifest), err
 }
 
-func makeTFVars(name string, cfg *appdbv1.AppDBCloudSQLTerraformDriver) (map[string]string, error) {
+func makeTFVars(instance string, dbname string, users []string) (map[string]string, error) {
 	var tfvars = make(map[string]string, 0)
 
-	// Names must be unique and cannot be reused across destroys.
-	// the Terraform source will create a new name using this as a prefix.
-	tfvars["name"] = name
+	tfvars["instance"] = instance
 
-	// Marshal params to json and unmarshal as tfvars
-	data, err := json.Marshal(cfg.Params)
-	if err != nil {
-		return tfvars, err
-	}
+	tfvars["dbname"] = dbname
 
-	var paramsJSON map[string]string
-	err = json.Unmarshal(data, &paramsJSON)
-	if err != nil {
-		return tfvars, err
-	}
-
-	for k, v := range paramsJSON {
-		tfvars[k] = v
-	}
+	tfvars["users"] = strings.Join(users, ",")
 
 	return tfvars, nil
 }

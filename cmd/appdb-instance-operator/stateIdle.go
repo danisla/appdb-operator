@@ -28,7 +28,7 @@ func stateIdle(parentType ParentType, parent *appdbv1.AppDBInstance, status *app
 
 			*desiredChildren = append(*desiredChildren, tfapply)
 
-			myLog(parent, "INFO", fmt.Sprintf("Created CloudSQL TerraformApply : %s", parent.Name))
+			myLog(parent, "INFO", fmt.Sprintf("Created CloudSQL TerraformApply: %s", parent.Name))
 
 			status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
 				TFApplyName: parent.Name,

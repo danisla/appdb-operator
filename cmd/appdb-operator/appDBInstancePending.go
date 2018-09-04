@@ -6,7 +6,7 @@ import (
 	"os/exec"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
-	yaml "gopkg.in/yaml.v2"
+	yaml "github.com/ghodss/yaml"
 )
 
 // Get AppDBInstance and wait for provisioning to complete.

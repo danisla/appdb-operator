@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 )
@@ -15,7 +16,7 @@ func makeStatus(parent *appdbv1.AppDBInstance, children *AppDBInstanceChildren) 
 	}
 
 	changed := false
-	sig := calcParentSig(parent, "")
+	sig := calcParentSig(parent.Spec, "")
 
 	if parent.Status.LastAppliedSig != "" {
 		if parent.Status.StateCurrent == StateIdle && sig != parent.Status.LastAppliedSig {
@@ -41,11 +42,11 @@ func makeStatus(parent *appdbv1.AppDBInstance, children *AppDBInstanceChildren) 
 	return &status
 }
 
-func calcParentSig(parent *appdbv1.AppDBInstance, addStr string) string {
+func calcParentSig(spec interface{}, addStr string) string {
 	hasher := sha1.New()
-	data, err := json.Marshal(&parent.Spec)
+	data, err := json.Marshal(&spec)
 	if err != nil {
-		myLog(parent, "ERROR", "Failed to convert parent spec to JSON, this is a bug.")
+		log.Printf("[ERROR] Failed to convert parent spec to JSON, this is a bug.\n")
 		return ""
 	}
 	hasher.Write([]byte(data))
@@ -59,7 +60,7 @@ func changeDetected(parent *appdbv1.AppDBInstance, children *AppDBInstanceChildr
 	if status.StateCurrent == StateIdle {
 
 		// Changed if parent spec changes
-		if status.LastAppliedSig != "" && status.LastAppliedSig != calcParentSig(parent, "") {
+		if status.LastAppliedSig != "" && status.LastAppliedSig != calcParentSig(parent.Spec, "") {
 			myLog(parent, "DEBUG", "Changed because parent sig different")
 			changed = true
 		}

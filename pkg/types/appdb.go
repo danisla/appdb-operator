@@ -4,14 +4,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// AppDBOperatorState represents the string mapping of the possible controller states. See the const definition below for enumerated states.
-type AppDBOperatorState string
-
 // AppDBOperatorStatus is the status structure for the custom resource
 type AppDBOperatorStatus struct {
-	LastAppliedSig    string                 `json:"lastAppliedSig"`
-	StateCurrent      AppDBOperatorState     `json:"stateCurrent"`
 	Provisioning      string                 `json:"provisioning"`
+	AppDBInstanceSig  string                 `json:"appDBInstanceSig"`
 	CloudSQLDB        *AppDBCloudSQLDBStatus `json:"cloudSQLDB"`
 	CredentialsSecret string                 `json:"credentialsSecret"`
 }
@@ -20,6 +16,7 @@ type AppDBOperatorStatus struct {
 type AppDBCloudSQLDBStatus struct {
 	TFApplyName    string
 	TFApplyPodName string
+	TFApplySig     string
 }
 
 // AppDB is the custom resource definition structure.

@@ -25,7 +25,7 @@ func stateCloudSQLRunning(parentType ParentType, parent *appdbv1.AppDBInstance, 
 
 		// Set the parent signature
 		// If parent changes from here on, we'll go back through the idle state, creating new resources.
-		status.LastAppliedSig = calcParentSig(parent, "")
+		status.LastAppliedSig = calcParentSig(parent.Spec, "")
 
 		return StateWaitComplete, nil
 	case "COMPLETED":
@@ -39,7 +39,7 @@ func stateCloudSQLRunning(parentType ParentType, parent *appdbv1.AppDBInstance, 
 
 		// Set the parent signature
 		// If parent changes from here on, we'll go back through the idle state, creating new resources.
-		status.LastAppliedSig = calcParentSig(parent, "")
+		status.LastAppliedSig = calcParentSig(parent.Spec, "")
 
 		return StateWaitComplete, nil
 	}

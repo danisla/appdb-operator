@@ -19,7 +19,7 @@ metadata:
   name: appdb-instance-operator
 spec:
   generateSelector: true
-  resyncPeriodSeconds: 4
+  resyncPeriodSeconds: 10
   parentResource:
     apiVersion: ctl.isla.solutions/v1
     resource: appdbinstances
@@ -57,7 +57,7 @@ metadata:
   name: appdb-operator
 spec:
   generateSelector: true
-  resyncPeriodSeconds: 4
+  resyncPeriodSeconds: 10
   parentResource:
     apiVersion: ctl.isla.solutions/v1
     resource: appdbs

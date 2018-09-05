@@ -28,6 +28,8 @@ func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi a
 		return tfapply, fmt.Errorf("Failed to generate tfvars from driver config: %v", err)
 	}
 
+	parentSig := calcParentSig(parent.Spec, "")
+
 	// Create new object.
 	tfapply = tfv1.Terraform{
 		TypeMeta: metav1.TypeMeta{
@@ -37,6 +39,9 @@ func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi a
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tfApplyName,
 			Namespace: parent.Namespace,
+			Annotations: map[string]string{
+				"appdb-parent-sig": parentSig,
+			},
 		},
 		Spec: tfv1.TerraformSpec{
 			Image:           tfDriverConfig.Image,

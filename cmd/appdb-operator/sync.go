@@ -91,6 +91,8 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 			} else {
 				// Patch tfapply with updated spec.
 				myLog(parent, "INFO", fmt.Sprintf("Patching TerraformApply: %s", tfApplyName))
+
+				myLog(parent, "WARN", "Patching not yet implemented!")
 			}
 		} else {
 			// Create new TerraformApply to create DB and users.

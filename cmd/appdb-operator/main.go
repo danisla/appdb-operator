@@ -34,10 +34,6 @@ func init() {
 	}
 }
 
-func myLog(parent *appdbv1.AppDB, level, msg string) {
-	log.Printf("[%s][%s][%s] %s", level, parent.Kind, parent.Name, msg)
-}
-
 func main() {
 	http.HandleFunc("/healthz", healthzHandler())
 	http.HandleFunc("/", webhookHandler())

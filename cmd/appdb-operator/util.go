@@ -14,6 +14,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func myLog(parent *appdbv1.AppDB, level, msg string) {
+	log.Printf("[%s][%s][%s] %s", level, parent.Kind, parent.Name, msg)
+}
+
 func getAppDBInstance(namespace string, name string) (appdbv1.AppDBInstance, error) {
 	var appdbi appdbv1.AppDBInstance
 	var stdout bytes.Buffer

@@ -16,7 +16,7 @@ const (
 	DEFAULT_CLOUD_SQL_DISK_TYPE   = "PD_SSD"
 )
 
-func makeCloudSQLTerraform(name, namespace string, driver *appdbv1.AppDBCloudSQLTerraformDriver) (tfv1.Terraform, error) {
+func makeCloudSQLTerraform(tfApplyName string, parent *appdbv1.AppDBInstance) (tfv1.Terraform, error) {
 	var tfapply tfv1.Terraform
 
 	manifest, err := getCloudSQLTerraformManifest(DEFAULT_CLOUD_SQL_SOURCE_PATH)
@@ -24,10 +24,12 @@ func makeCloudSQLTerraform(name, namespace string, driver *appdbv1.AppDBCloudSQL
 		return tfapply, fmt.Errorf("Error loading cloud sql terraform manifest from %s: %v", DEFAULT_CLOUD_SQL_SOURCE_PATH, err)
 	}
 
-	tfvars, err := makeTFVars(name, driver)
+	tfvars, err := makeTFVars(tfApplyName, parent.Spec.Driver.CloudSQLTerraform)
 	if err != nil {
 		return tfapply, fmt.Errorf("Failed to generate tfvars from driver config: %v", err)
 	}
+
+	parentSig := calcParentSig(parent.Spec, "")
 
 	tfapply = tfv1.Terraform{
 		TypeMeta: metav1.TypeMeta{
@@ -35,8 +37,11 @@ func makeCloudSQLTerraform(name, namespace string, driver *appdbv1.AppDBCloudSQL
 			Kind:       "TerraformApply",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      tfApplyName,
+			Namespace: parent.Namespace,
+			Annotations: map[string]string{
+				"appdb-parent-sig": parentSig,
+			},
 		},
 		Spec: tfv1.TerraformSpec{
 			Image:           tfDriverConfig.Image,

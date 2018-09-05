@@ -5,18 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// AppDBInstanceOperatorState represents the string mapping of the possible controller states.
-type AppDBInstanceOperatorState string
-
-// ProvisioningStatus represents the string mapping to the possible status.Provisioning values. See the const definition below for enumerated states.
-type ProvisioningStatus string
-
-const (
-	ProvisioningStatusPending  = "PENDING"
-	ProvisioningStatusFailed   = "FAILED"
-	ProvisioningStatusComplete = "COMPLETE"
-)
-
 // AppDBInstance is the custom resource definition structure.
 type AppDBInstance struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -27,10 +15,8 @@ type AppDBInstance struct {
 
 // AppDBInstanceOperatorStatus is the status structure for the custom resource
 type AppDBInstanceOperatorStatus struct {
-	LastAppliedSig string                       `json:"lastAppliedSig"`
-	StateCurrent   AppDBInstanceOperatorState   `json:"stateCurrent"`
-	Provisioning   string                       `json:"provisioning"`
-	CloudSQL       *AppDBInstanceCloudSQLStatus `json:"cloudSQL"`
+	Provisioning string                       `json:"provisioning"`
+	CloudSQL     *AppDBInstanceCloudSQLStatus `json:"cloudSQL"`
 }
 
 // AppDBInstanceCloudSQLStatus is the status structure for the CloudSQL driver
@@ -38,6 +24,7 @@ type AppDBInstanceCloudSQLStatus struct {
 	InstanceName   string
 	TFApplyName    string
 	TFApplyPodName string
+	TFApplySig     string
 }
 
 // AppDBInstanceSpec is the top level structure of the spec body

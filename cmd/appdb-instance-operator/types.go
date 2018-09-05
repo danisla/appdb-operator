@@ -7,17 +7,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	// StateNone is the inital state for a new spec.
-	StateNone = appdbv1.AppDBInstanceOperatorState("NONE")
-	// StateIdle means there are no more changes pending
-	StateIdle = appdbv1.AppDBInstanceOperatorState("IDLE")
-	// StateWaitComplete is used to indicate that a wait is complete and to transition back through the idle handler.
-	StateWaitComplete = appdbv1.AppDBInstanceOperatorState("WAIT_COMPLETE")
-	// StateCLoudSQLPending means control loop is waiting for Cloud SQL driver to finish provisioning database instance.func Benchmark(b *testing.B) {
-	StateCloudSQLPending = appdbv1.AppDBInstanceOperatorState("CLOUDSQL_PENDING")
-)
-
 // ParentType represents the strign mapping to the possible parent types in the const below.
 type ParentType string
 

@@ -46,11 +46,23 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 						if err != nil {
 							myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
 						} else {
-							err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
-							if err != nil {
-								myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
-							} else {
+							if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
+								// found existing tfapply, apply changes to it.
+								err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
+								if err != nil {
+									myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
+								} else {
 
+									status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
+										TFApplyName: tfapply.ObjectMeta.Name,
+										TFApplySig:  calcParentSig(parent.Spec, ""),
+									}
+
+									desiredTFApplys[tfApplyName] = true
+									desiredChildren = append(desiredChildren, tfapply)
+								}
+							} else {
+								// No existing tfapply, create new one.
 								status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
 									TFApplyName: tfapply.ObjectMeta.Name,
 									TFApplySig:  calcParentSig(parent.Spec, ""),
@@ -68,6 +80,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 				}
 			} else {
 				myLog(parent, "WARN", "Found TerraformPlan with non-matching parent sig.")
+				return &status, &desiredChildren, nil
 			}
 		}
 
@@ -104,32 +117,32 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 					tfplan, err := makeCloudSQLTerraform(tfApplyName, parent)
 					if err != nil {
 						myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformPlan spec to check breaking changes for CloudSQL: %v", err))
-						return &status, &desiredChildren, nil
-					}
-					tfplan.TypeMeta.Kind = "TerraformPlan"
-					status.CloudSQL.TFPlanName = tfApplyName
-					status.CloudSQL.TFPlanSig = calcParentSig(parent.Spec, "")
+					} else {
+						tfplan.TypeMeta.Kind = "TerraformPlan"
+						status.CloudSQL.TFPlanName = tfApplyName
+						status.CloudSQL.TFPlanSig = calcParentSig(parent.Spec, "")
 
-					desiredTFPlans[tfApplyName] = true
-					desiredChildren = append(desiredChildren, tfplan)
+						desiredTFPlans[tfApplyName] = true
+						desiredChildren = append(desiredChildren, tfplan)
+					}
 				}
 			}
 		} else {
 			// Create new TerraformApply to provision DB instance.
-			tfapply, err := makeCloudSQLTerraform(tfApplyName, parent)
+
+			// Verify requested change won't trigger a destroy operation.
+			tfplan, err := makeCloudSQLTerraform(tfApplyName, parent)
 			if err != nil {
-				myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
-				return &status, &desiredChildren, nil
-			}
+				myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformPlan spec to check breaking changes for CloudSQL: %v", err))
+			} else {
+				tfplan.TypeMeta.Kind = "TerraformPlan"
+				status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
+					TFPlanName: tfApplyName,
+					TFPlanSig:  calcParentSig(parent.Spec, ""),
+				}
 
-			desiredTFApplys[tfApplyName] = true
-			desiredChildren = append(desiredChildren, tfapply)
-
-			myLog(parent, "INFO", fmt.Sprintf("Creating TerraformApply: %s", tfApplyName))
-
-			status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
-				TFApplyName: tfapply.ObjectMeta.Name,
-				TFApplySig:  calcParentSig(parent.Spec, ""),
+				desiredTFPlans[tfApplyName] = true
+				desiredChildren = append(desiredChildren, tfplan)
 			}
 		}
 

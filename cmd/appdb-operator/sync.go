@@ -12,17 +12,8 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 	desiredChildren := make([]interface{}, 0)
 	nextState := currState[0:1] + currState[1:] // string copy of currState
 
-	// Used to decide when to claim children or when to expect them to be recreated by the state handlers.
-	// changed := changeDetected(parent, children, status)
-
 	var err error
 	switch currState {
-	// case StateIdle:
-	// 	if changed {
-	// 		myLog(parent, "DEBUG", "In StateIdle, changed is true.")
-	// 		nextState, err = stateIdle(parentType, parent, status, children, &desiredChildren)
-	// 	}
-
 	case StateNone, StateIdle, StateWaitComplete:
 		nextState, err = stateIdle(parentType, parent, status, children, &desiredChildren)
 

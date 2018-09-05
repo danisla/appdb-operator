@@ -25,6 +25,9 @@ type AppDBInstanceCloudSQLStatus struct {
 	TFApplyName    string
 	TFApplyPodName string
 	TFApplySig     string
+	TFPlanName     string
+	TFPlanPodName  string
+	TFPlanSig      string
 }
 
 // AppDBInstanceSpec is the top level structure of the spec body

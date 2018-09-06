@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os/exec"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 )
@@ -23,4 +25,28 @@ func calcParentSig(spec interface{}, addStr string) string {
 	hasher.Write([]byte(data))
 	hasher.Write([]byte(addStr))
 	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
+func kubectlApply(namespace string, name string, spec interface{}) error {
+	specJSON, err := json.Marshal(spec)
+	if err != nil {
+		return err
+	}
+
+	stdin := bytes.NewReader(specJSON)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	cmd := exec.Command("kubectl", "-n", namespace, "apply", "-f", "-")
+	cmd.Stdin = stdin
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Failed to run kubectl: %s\n%v", stderr.String(), err)
+	}
+
+	return err
 }

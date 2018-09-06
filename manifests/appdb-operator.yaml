@@ -30,6 +30,8 @@ spec:
     resource: deployments
   - apiVersion: ctl.isla.solutions/v1
     resource: terraformapplys
+  - apiVersion: ctl.isla.solutions/v1
+    resource: terraformplans
   hooks:
     sync:
       webhook:
@@ -66,6 +68,8 @@ spec:
     resource: secrets
   - apiVersion: ctl.isla.solutions/v1
     resource: terraformapplys
+  - apiVersion: ctl.isla.solutions/v1
+    resource: terraformplans
   hooks:
     sync:
       webhook:
@@ -94,11 +98,22 @@ spec:
         image: gcr.io/cloud-solutions-group/appdb-operator:latest
         imagePullPolicy: Always
         command: ["/usr/bin/appdb-instance-operator"]
+        env:
+        - name: TF_IMAGE
+          value: gcr.io/cloud-solutions-group/terraform-pod:v0.11.8
+        - name: TF_IMAGE_PULL_POLICY
+          value: Always
+        # - name: HTTP_DEBUG
+        #   value: "true"
       - name: appdb-operator
         image: gcr.io/cloud-solutions-group/appdb-operator:latest
         imagePullPolicy: Always
         command: ["/usr/bin/appdb-operator"]
-        # env:
+        env:
+        - name: TF_IMAGE
+          value: gcr.io/cloud-solutions-group/terraform-pod:v0.11.8
+        - name: TF_IMAGE_PULL_POLICY
+          value: Always
         # - name: HTTP_DEBUG
         #   value: "true"
 ---

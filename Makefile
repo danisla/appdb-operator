@@ -18,6 +18,9 @@ install-terraform-operator:
 	kubectl apply -f https://raw.githubusercontent.com/danisla/terraform-operator/master/manifests/terraform-operator-rbac.yaml
 	kubectl apply -f https://raw.githubusercontent.com/danisla/terraform-operator/master/manifests/terraform-operator.yaml
 
+lpods:
+	kubectl -n metacontroller get pods
+	
 metalogs:
 	kubectl -n metacontroller logs --tail=200 -f metacontroller-0
 

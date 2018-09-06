@@ -14,9 +14,9 @@ type AppDBOperatorStatus struct {
 
 // AppDBCloudSQLDBStatus is the status structure for the CloudSQL driver
 type AppDBCloudSQLDBStatus struct {
-	TFApplyName    string
-	TFApplyPodName string
-	TFApplySig     string
+	TFApplyName    string `json:"tfapplyName,omitempty"`
+	TFApplyPodName string `json:"tfapplyPodName,omitempty"`
+	TFApplySig     string `json:"tfapplySig,omitempty"`
 }
 
 // AppDB is the custom resource definition structure.

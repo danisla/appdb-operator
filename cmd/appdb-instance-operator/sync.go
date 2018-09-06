@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 	"github.com/jinzhu/copier"
@@ -36,6 +37,18 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 					// Check plan
 					if tfplan.Status.TFPlanDiff.Destroyed > 0 {
 						myLog(parent, "ERROR", "TerraformPlan contains destroy actions, skipping patch.")
+
+						// Retry in 60 seconds.
+						tfplanFishedAtTime, err := time.Parse(time.RFC3339, tfplan.Status.FinishedAt)
+						if err != nil {
+							myLog(parent, "WARN", fmt.Sprintf("Failed to parse tfplan finished at time: %v", err))
+						} else {
+							if time.Since(tfplanFishedAtTime).Seconds() > 60 {
+								myLog(parent, "INFO", "Retrying TerraformPlan")
+								// Setting desiredTFPlans to true will cause it to be omitted during the claim phase, therefore deleting it.
+								desiredTFPlans[tfApplyName] = true
+							}
+						}
 					} else {
 						myLog(parent, "INFO", "TerraformPlan contains no destroy actions, proceeding with patch.")
 
@@ -119,30 +132,37 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 						myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformPlan spec to check breaking changes for CloudSQL: %v", err))
 					} else {
 						tfplan.TypeMeta.Kind = "TerraformPlan"
-						status.CloudSQL.TFPlanName = tfApplyName
-						status.CloudSQL.TFPlanSig = calcParentSig(parent.Spec, "")
+
+						status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
+							TFPlanName: tfApplyName,
+							TFPlanSig:  calcParentSig(parent.Spec, ""),
+						}
 
 						desiredTFPlans[tfApplyName] = true
 						desiredChildren = append(desiredChildren, tfplan)
+
+						myLog(parent, "INFO", fmt.Sprintf("Created TerraformPlan: %s", tfApplyName))
 					}
 				}
 			}
 		} else {
-			// Create new TerraformApply to provision DB instance.
+			if planRunning == false {
+				// Create new TerraformPlan first before provisioning DB instance.
+				tfplan, err := makeCloudSQLTerraform(tfApplyName, parent)
+				if err != nil {
+					myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformPlan spec to check breaking changes for CloudSQL: %v", err))
+				} else {
+					tfplan.TypeMeta.Kind = "TerraformPlan"
+					status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
+						TFPlanName: tfApplyName,
+						TFPlanSig:  calcParentSig(parent.Spec, ""),
+					}
 
-			// Verify requested change won't trigger a destroy operation.
-			tfplan, err := makeCloudSQLTerraform(tfApplyName, parent)
-			if err != nil {
-				myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformPlan spec to check breaking changes for CloudSQL: %v", err))
-			} else {
-				tfplan.TypeMeta.Kind = "TerraformPlan"
-				status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
-					TFPlanName: tfApplyName,
-					TFPlanSig:  calcParentSig(parent.Spec, ""),
+					desiredTFPlans[tfApplyName] = true
+					desiredChildren = append(desiredChildren, tfplan)
+
+					myLog(parent, "INFO", fmt.Sprintf("Created TerraformPlan: %s", tfApplyName))
 				}
-
-				desiredTFPlans[tfApplyName] = true
-				desiredChildren = append(desiredChildren, tfplan)
 			}
 		}
 

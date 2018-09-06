@@ -21,13 +21,13 @@ type AppDBInstanceOperatorStatus struct {
 
 // AppDBInstanceCloudSQLStatus is the status structure for the CloudSQL driver
 type AppDBInstanceCloudSQLStatus struct {
-	InstanceName   string
-	TFApplyName    string
-	TFApplyPodName string
-	TFApplySig     string
-	TFPlanName     string
-	TFPlanPodName  string
-	TFPlanSig      string
+	InstanceName   string `json:"instanceName,omitempty"`
+	TFApplyName    string `json:"tfapplyName,omitempty"`
+	TFApplyPodName string `json:"tfapplyPodName,omitempty"`
+	TFApplySig     string `json:"tfapplySig,omitempty"`
+	TFPlanName     string `json:"tfplanName,omitempty"`
+	TFPlanPodName  string `json:"tfplanPodName,omitempty"`
+	TFPlanSig      string `json:"tfplanSig,omitempty"`
 }
 
 // AppDBInstanceSpec is the top level structure of the spec body

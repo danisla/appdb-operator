@@ -90,9 +90,31 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 				}
 			} else {
 				// Patch tfapply with updated spec.
-				myLog(parent, "INFO", fmt.Sprintf("Patching TerraformApply: %s", tfApplyName))
+				myLog(parent, "INFO", fmt.Sprintf("Change detected, patching TerraformApply: %s", tfApplyName))
 
-				myLog(parent, "WARN", "Patching not yet implemented!")
+				tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
+				if err != nil {
+					myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
+				} else {
+					if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
+						// found existing tfapply, apply changes to it.
+						err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
+						if err != nil {
+							myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
+						} else {
+
+							status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
+								TFApplyName: tfapply.ObjectMeta.Name,
+								TFApplySig:  calcParentSig(parent.Spec, ""),
+							}
+
+							desiredTFApplys[tfApplyName] = true
+							desiredChildren = append(desiredChildren, tfapply)
+						}
+					} else {
+						myLog(parent, "WARN", "No existing TerraformApply claimed to main changes to.")
+					}
+				}
 			}
 		} else {
 			// Create new TerraformApply to create DB and users.

@@ -1,5 +1,5 @@
 TEST_CLOUDSQL_ARTIFACTS := db1-cloudsql-appdbinstance.yaml db1-cloudsql-tfdestroy.yaml
-TEST_APPDB_ARTIFACTS := db1-app1-appdb.yaml
+TEST_APPDB_ARTIFACTS := db1-app1-appdb.yaml db1-app1-appdb-tfdestroy.yaml
 
 TEST_ARTIFACTS := $(TEST_CLOUDSQL_ARTIFACTS) $(TEST_APPDB_ARTIFACTS)
 
@@ -44,8 +44,10 @@ spec:
       secretName: {{GOOGLE_PROVIDER_SECRET_NAME}}
   sources:
   - tfapply: {{SRC_TFAPPLY}}
+    tfplan: {{SRC_TFAPPLY}}
   tfvarsFrom:
-  - tfapply: {{SRC_TFAPPLY}}
+  - tfplan: {{SRC_TFAPPLY}}
+    tfapply: {{SRC_TFAPPLY}}
 endef
 
 define TEST_APPDB
@@ -77,6 +79,17 @@ tests/db%-cloudsql-tfdestroy.yaml: backend_bucket
 	@echo "$${TEST_CLOUDSQL_DESTROY}" | \
 	sed -e "s/{{NAME}}/db$*-cloudsql/g" \
 	    -e "s/{{SRC_TFAPPLY}}/db$*-cloudsql/g" \
+      -e "s/{{BACKEND_BUCKET}}/$(BACKEND_BUCKET)/g" \
+	    -e "s/{{BACKEND_PREFIX}}/terraform/g" \
+	    -e "s/{{GOOGLE_PROVIDER_SECRET_NAME}}/$(GOOGLE_PROVIDER_SECRET_NAME)/g" \
+	>$@
+
+export TEST_CLOUDSQL_DESTROY
+tests/db1-app%-appdb-tfdestroy.yaml: backend_bucket
+	@mkdir -p tests
+	@echo "$${TEST_CLOUDSQL_DESTROY}" | \
+	sed -e "s/{{NAME}}/db1-cloudsql-app$*/g" \
+	    -e "s/{{SRC_TFAPPLY}}/db1-cloudsql-app$*/g" \
       -e "s/{{BACKEND_BUCKET}}/$(BACKEND_BUCKET)/g" \
 	    -e "s/{{BACKEND_PREFIX}}/terraform/g" \
 	    -e "s/{{GOOGLE_PROVIDER_SECRET_NAME}}/$(GOOGLE_PROVIDER_SECRET_NAME)/g" \

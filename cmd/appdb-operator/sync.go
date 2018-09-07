@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 
@@ -85,6 +86,18 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 					}
 				} else if tfapply.Status.PodStatus == "FAILED" {
 					status.Provisioning = appdbv1.ProvisioningStatusFailed
+
+					// Try again in 60 seconds.
+					tfapplyFishedAtTime, err := time.Parse(time.RFC3339, tfapply.Status.FinishedAt)
+					if err != nil {
+						myLog(parent, "WARN", fmt.Sprintf("Failed to parse tfplan finished at time: %v", err))
+					} else {
+						if time.Since(tfapplyFishedAtTime).Seconds() > 60 {
+							myLog(parent, "INFO", "Retrying TerraformApply")
+							// Setting desiredTFApplys to true will cause it to be omitted during the claim phase, therefore deleting it.
+							desiredTFApplys[tfApplyName] = true
+						}
+					}
 				} else {
 					status.Provisioning = appdbv1.ProvisioningStatusPending
 				}

@@ -28,7 +28,10 @@ spec:
         disk_type: "PD_SSD"
       proxy:
         image: gcr.io/cloudsql-docker/gce-proxy:1.11
-        replicas: 3
+        replicas: 1
+        serviceAccount:
+          name: $(GOOGLE_PROVIDER_SECRET_NAME)
+          key: GOOGLE_CREDENTIALS
 endef
 
 define TEST_CLOUDSQL_DESTROY

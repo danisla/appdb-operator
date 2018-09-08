@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -10,6 +11,7 @@ import (
 
 	tfdriverv1 "github.com/danisla/appdb-operator/pkg/tfdriver"
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -19,8 +21,10 @@ var (
 
 func init() {
 	config = Config{
-		Project:    "", // Derived from instance metadata server
-		ProjectNum: "", // Derived from instance metadata server
+		Project:                      "",                                      // Derived from instance metadata server
+		ProjectNum:                   "",                                      // Derived from instance metadata server
+		CloudSQLProxyImage:           "gcr.io/cloudsql-docker/gce-proxy:1.11", // Override with env var: CLOUD_SQL_PROXY_IMAGE
+		CLoudSQLProxyImagePullPolicy: corev1.PullIfNotPresent,                 // Override with env var: CLOUD_SQL_PROXY_IMAGE_PULL_POLICY
 	}
 
 	if err := config.loadAndValidate(); err != nil {
@@ -50,6 +54,12 @@ func healthzHandler() func(w http.ResponseWriter, r *http.Request) {
 
 func webhookHandler() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		var req SyncRequest
+		var desiredStatus *appdbv1.AppDBInstanceOperatorStatus
+		var desiredChildren *[]interface{}
+		var parentType ParentType
+
 		if r.Method != "POST" {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "Unsupported method\n")
@@ -59,21 +69,23 @@ func webhookHandler() func(w http.ResponseWriter, r *http.Request) {
 		if os.Getenv("HTTP_DEBUG") != "" {
 			log.Printf("---HTTP REQUEST %s %s ---", r.Method, r.URL.String())
 			reqDump, _ := httputil.DumpRequest(r, true)
-			log.Printf(string(reqDump))
+			log.Println(string(reqDump))
 		}
 
-		var req SyncRequest
-		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&req); err != nil {
+		reqBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("[ERROR] Failed to read request body: %v", err)
+			return
+		}
+
+		err = json.Unmarshal(reqBody, &req)
+		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf("[ERROR] Could not parse SyncRequest: %v", err)
 			return
 		}
 
-		var err error
-		var desiredStatus *appdbv1.AppDBInstanceOperatorStatus
-		var desiredChildren *[]interface{}
-		var parentType ParentType
 		switch req.Parent.Kind {
 		case "AppDBInstance":
 			parentType = ParentDBInstance
@@ -96,6 +108,11 @@ func webhookHandler() func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[ERROR] Could not generate SyncResponse: %v", err)
 			return
 		}
-		fmt.Fprintf(w, string(data))
+		w.Write(data)
+
+		if os.Getenv("HTTP_DEBUG") != "" {
+			log.Printf("---JSON RESPONSE %s %s ---", r.Method, r.URL.String())
+			log.Println(string(data))
+		}
 	}
 }

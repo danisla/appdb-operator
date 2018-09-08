@@ -25,6 +25,7 @@ resource "random_id" "name" {
 locals {
   project = "${var.project == "" ? data.google_client_config.current.project : var.project }"
   name    = "${var.name}-${random_id.name.hex}"
+  port = "${substr(var.database_version, 0, 5) == "MYSQL" ? "3306" : "5432"}"
 }
 
 module "db-instance" {
@@ -49,4 +50,8 @@ output "connection" {
 
 output "admin_pass" {
   value = "${module.db-instance.generated_user_password}"
+}
+
+output "port" {
+  value = "${local.port}"
 }

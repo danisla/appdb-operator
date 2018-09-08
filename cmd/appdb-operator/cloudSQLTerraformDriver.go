@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -74,7 +73,7 @@ func getCloudSQLTerraformManifest(srcPath string) (string, error) {
 		return string(manifest), err
 	}
 
-	return base64.StdEncoding.EncodeToString(manifest), err
+	return string(manifest), err
 }
 
 func makeTFVars(instance string, dbname string, users []string) (map[string]string, error) {

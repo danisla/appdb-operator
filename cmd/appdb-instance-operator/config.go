@@ -2,17 +2,21 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"cloud.google.com/go/compute/metadata"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 // Config is the configuration structure used by the controller.
 type Config struct {
-	Project    string
-	ProjectNum string
-	clientset  *kubernetes.Clientset
+	Project                      string
+	ProjectNum                   string
+	clientset                    *kubernetes.Clientset
+	CloudSQLProxyImage           string
+	CLoudSQLProxyImagePullPolicy corev1.PullPolicy
 }
 
 func (c *Config) loadAndValidate() error {
@@ -44,6 +48,16 @@ func (c *Config) loadAndValidate() error {
 		return err
 	}
 	c.clientset = clientset
+
+	// CLOUD_SQL_PROXY_IMAGE is optional
+	if image, ok := os.LookupEnv("CLOUD_SQL_PROXY_IMAGE"); ok == true {
+		c.CloudSQLProxyImage = image
+	}
+
+	// CLOUD_SQL_PROXY_IMAGE_PULL_POLICY is optional
+	if pullPolicy, ok := os.LookupEnv("CLOUD_SQL_PROXY_IMAGE_PULL_POLICY"); ok == true {
+		c.CLoudSQLProxyImagePullPolicy = corev1.PullPolicy(pullPolicy)
+	}
 
 	return nil
 }

@@ -32,7 +32,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 	}
 
 	var appdbi appdbv1.AppDBInstance
-	appdbi, err = getAppDBInstance(parent.ObjectMeta.Namespace, parent.Spec.AppDBInstance)
+	appdbi, err = getAppDBInstance(parent.GetNamespace(), parent.Spec.AppDBInstance)
 	if err != nil {
 		// Wait for AppDBInstance provisioning status to COMPLETE
 		myLog(parent, "INFO", fmt.Sprintf("Waiting for AppDBInstance: %s", parent.Spec.AppDBInstance))
@@ -53,79 +53,84 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 
 	if appdbi.Spec.Driver.CloudSQLTerraform != nil {
 
-		tfApplyName := fmt.Sprintf("%s-%s", appdbi.ObjectMeta.Name, parent.Name)
+		tfApplyName := fmt.Sprintf("%s-%s", appdbi.GetName(), parent.Name)
 
 		if tfapply, ok := children.TerraformApplys[tfApplyName]; ok == true {
-			mySig := calcParentSig(parent.Spec, "")
-			tfapplySig := tfapply.Annotations["appdb-parent-sig"]
-
-			if mySig == tfapplySig {
-
-				status.CloudSQLDB.TFApplyPodName = tfapply.Status.PodName
-
-				if tfapply.Status.PodStatus == "COMPLETED" {
-					status.Provisioning = appdbv1.ProvisioningStatusComplete
-
-					// Generate secret for DB credentials.
-					if passwordsVar, ok := tfapply.Status.TFOutput["user_passwords"]; ok == true {
-						secretName := status.CloudSQLDB.TFApplyName
-
-						passwords := strings.Split(passwordsVar.Value, ",")
-						if len(parent.Spec.Users) != len(passwords) {
-							myLog(parent, "ERROR", "passwords output from TerraformApply is different length than input users.")
-						} else {
-							secret := makeCredentialsSecret(secretName, parent.ObjectMeta.Namespace, parent.Spec.Users, passwords)
-
-							desiredSecrets[secretName] = true
-							desiredChildren = append(desiredChildren, secret)
-
-							status.CredentialsSecret = secretName
-						}
-					} else {
-						myLog(parent, "ERROR", "No user_passwords found in output varibles of TerraformApply status")
-					}
-				} else if tfapply.Status.PodStatus == "FAILED" {
-					status.Provisioning = appdbv1.ProvisioningStatusFailed
-
-					// Try again in 60 seconds.
-					tfapplyFishedAtTime, err := time.Parse(time.RFC3339, tfapply.Status.FinishedAt)
-					if err != nil {
-						myLog(parent, "WARN", fmt.Sprintf("Failed to parse tfplan finished at time: %v", err))
-					} else {
-						if time.Since(tfapplyFishedAtTime).Seconds() > 60 {
-							myLog(parent, "INFO", "Retrying TerraformApply")
-							// Setting desiredTFApplys to true will cause it to be omitted during the claim phase, therefore deleting it.
-							desiredTFApplys[tfApplyName] = true
-						}
-					}
-				} else {
-					status.Provisioning = appdbv1.ProvisioningStatusPending
-				}
+			if status.CloudSQLDB == nil {
+				myLog(parent, "WARN", "Found TerraformPlan in children, but status.CloudSQLDB was nil, re-sync collision.")
 			} else {
-				// Patch tfapply with updated spec.
-				myLog(parent, "INFO", fmt.Sprintf("Change detected, patching TerraformApply: %s", tfApplyName))
 
-				tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
-				if err != nil {
-					myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
-				} else {
-					if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
-						// found existing tfapply, apply changes to it.
-						err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
-						if err != nil {
-							myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
-						} else {
+				mySig := calcParentSig(parent.Spec, "")
+				tfapplySig := tfapply.Annotations["appdb-parent-sig"]
 
-							status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
-								TFApplyName: tfapply.ObjectMeta.Name,
-								TFApplySig:  calcParentSig(parent.Spec, ""),
+				if mySig == tfapplySig {
+
+					status.CloudSQLDB.TFApplyPodName = tfapply.Status.PodName
+
+					if tfapply.Status.PodStatus == "COMPLETED" {
+						status.Provisioning = appdbv1.ProvisioningStatusComplete
+
+						// Generate secret for DB credentials.
+						if passwordsVar, ok := tfapply.Status.TFOutput["user_passwords"]; ok == true {
+							secretName := status.CloudSQLDB.TFApplyName
+
+							passwords := strings.Split(passwordsVar.Value, ",")
+							if len(parent.Spec.Users) != len(passwords) {
+								myLog(parent, "ERROR", "passwords output from TerraformApply is different length than input users.")
+							} else {
+								secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users, passwords)
+
+								desiredSecrets[secretName] = true
+								desiredChildren = append(desiredChildren, secret)
+
+								status.CredentialsSecret = secretName
 							}
+						} else {
+							myLog(parent, "ERROR", "No user_passwords found in output varibles of TerraformApply status")
+						}
+					} else if tfapply.Status.PodStatus == "FAILED" {
+						status.Provisioning = appdbv1.ProvisioningStatusFailed
 
-							desiredTFApplys[tfApplyName] = true
-							desiredChildren = append(desiredChildren, tfapply)
+						// Try again in 60 seconds.
+						tfapplyFishedAtTime, err := time.Parse(time.RFC3339, tfapply.Status.FinishedAt)
+						if err != nil {
+							myLog(parent, "WARN", fmt.Sprintf("Failed to parse tfplan finished at time: %v", err))
+						} else {
+							if time.Since(tfapplyFishedAtTime).Seconds() > 60 {
+								myLog(parent, "INFO", "Retrying TerraformApply")
+								// Setting desiredTFApplys to true will cause it to be omitted during the claim phase, therefore deleting it.
+								desiredTFApplys[tfApplyName] = true
+							}
 						}
 					} else {
-						myLog(parent, "WARN", "No existing TerraformApply claimed to main changes to.")
+						status.Provisioning = appdbv1.ProvisioningStatusPending
+					}
+				} else {
+					// Patch tfapply with updated spec.
+					myLog(parent, "INFO", fmt.Sprintf("Change detected, patching TerraformApply: %s", tfApplyName))
+
+					tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
+					if err != nil {
+						myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
+					} else {
+						if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
+							// found existing tfapply, apply changes to it.
+							err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
+							if err != nil {
+								myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
+							} else {
+
+								status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
+									TFApplyName: tfapply.GetName(),
+									TFApplySig:  calcParentSig(parent.Spec, ""),
+								}
+
+								desiredTFApplys[tfApplyName] = true
+								desiredChildren = append(desiredChildren, tfapply)
+							}
+						} else {
+							myLog(parent, "WARN", "No existing TerraformApply claimed to main changes to.")
+						}
 					}
 				}
 			}
@@ -143,7 +148,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 			myLog(parent, "INFO", fmt.Sprintf("Creating TerraformApply: %s", tfApplyName))
 
 			status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
-				TFApplyName: tfapply.ObjectMeta.Name,
+				TFApplyName: tfapply.GetName(),
 				TFApplySig:  calcParentSig(parent.Spec, ""),
 			}
 		}

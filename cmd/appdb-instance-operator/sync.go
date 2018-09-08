@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
@@ -24,76 +25,83 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 		planRunning := false
 
 		if tfplan, ok := children.TerraformPlans[tfApplyName]; ok == true {
-			// Handle terraform plan
-			mySig := calcParentSig(parent.Spec, "")
-			tfplanSig := tfplan.Annotations["appdb-parent-sig"]
 
-			if mySig == tfplanSig {
-				status.CloudSQL.TFPlanPodName = tfplan.Status.PodName
+			if status.CloudSQL == nil {
+				myLog(parent, "WARN", "Found TerraformPlan in children, but status.CloudSQL was nil, re-sync collision.")
+			} else {
 
-				planRunning = true
+				// Handle terraform plan
+				mySig := calcParentSig(parent.Spec, "")
+				tfplanSig := tfplan.Annotations["appdb-parent-sig"]
 
-				if tfplan.Status.PodStatus == "COMPLETED" {
-					// Check plan
-					if tfplan.Status.TFPlanDiff.Destroyed > 0 {
-						myLog(parent, "ERROR", "TerraformPlan contains destroy actions, skipping patch.")
+				if mySig == tfplanSig {
+					// TODO: something this throws a nil pointer dereference... maybe a resync collision.
+					status.CloudSQL.TFPlanPodName = tfplan.Status.PodName
 
-						// Retry in 60 seconds.
-						tfplanFishedAtTime, err := time.Parse(time.RFC3339, tfplan.Status.FinishedAt)
-						if err != nil {
-							myLog(parent, "WARN", fmt.Sprintf("Failed to parse tfplan finished at time: %v", err))
-						} else {
-							if time.Since(tfplanFishedAtTime).Seconds() > 60 {
-								myLog(parent, "INFO", "Retrying TerraformPlan")
-								// Setting desiredTFPlans to true will cause it to be omitted during the claim phase, therefore deleting it.
-								desiredTFPlans[tfApplyName] = true
+					planRunning = true
+
+					if tfplan.Status.PodStatus == "COMPLETED" {
+						// Check plan
+						if tfplan.Status.TFPlanDiff.Destroyed > 0 {
+							myLog(parent, "ERROR", "TerraformPlan contains destroy actions, skipping patch.")
+
+							// Retry in 60 seconds.
+							tfplanFishedAtTime, err := time.Parse(time.RFC3339, tfplan.Status.FinishedAt)
+							if err != nil {
+								myLog(parent, "WARN", fmt.Sprintf("Failed to parse tfplan finished at time: %v", err))
+							} else {
+								if time.Since(tfplanFishedAtTime).Seconds() > 60 {
+									myLog(parent, "INFO", "Retrying TerraformPlan")
+									// Setting desiredTFPlans to true will cause it to be omitted during the claim phase, therefore deleting it.
+									desiredTFPlans[tfApplyName] = true
+								}
 							}
-						}
-					} else {
-						myLog(parent, "INFO", "TerraformPlan contains no destroy actions, proceeding with patch.")
-
-						// Setting desiredTFPlans to true will cause it to be omitted during the claim phase, therefore deleting it.
-						desiredTFPlans[tfApplyName] = true
-
-						tfapply, err := makeCloudSQLTerraform(tfApplyName, parent)
-						if err != nil {
-							myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
 						} else {
-							if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
-								// found existing tfapply, apply changes to it.
-								err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
-								if err != nil {
-									myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
-								} else {
+							myLog(parent, "INFO", "TerraformPlan contains no destroy actions, proceeding with update.")
 
+							// Setting desiredTFPlans to true will cause it to be omitted during the claim phase, therefore deleting it.
+							desiredTFPlans[tfApplyName] = true
+
+							tfapply, err := makeCloudSQLTerraform(tfApplyName, parent)
+							if err != nil {
+								myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
+							} else {
+								if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
+									// found existing tfapply, apply changes to it.
+									err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
+									if err != nil {
+										myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
+									} else {
+
+										status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
+											TFApplyName: tfapply.GetName(),
+											TFApplySig:  calcParentSig(parent.Spec, ""),
+										}
+
+										desiredTFApplys[tfApplyName] = true
+										desiredChildren = append(desiredChildren, tfapply)
+									}
+								} else {
+									// No existing tfapply, create new one.
 									status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
-										TFApplyName: tfapply.ObjectMeta.Name,
+										TFApplyName: tfapply.GetName(),
 										TFApplySig:  calcParentSig(parent.Spec, ""),
 									}
 
 									desiredTFApplys[tfApplyName] = true
 									desiredChildren = append(desiredChildren, tfapply)
 								}
-							} else {
-								// No existing tfapply, create new one.
-								status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{
-									TFApplyName: tfapply.ObjectMeta.Name,
-									TFApplySig:  calcParentSig(parent.Spec, ""),
-								}
-
-								desiredTFApplys[tfApplyName] = true
-								desiredChildren = append(desiredChildren, tfapply)
 							}
 						}
+					} else if tfplan.Status.PodStatus == "FAILED" {
+						myLog(parent, "WARN", "Failed to run TerraformPlan")
+					} else {
+						// Wait for plan to complete.
 					}
-				} else if tfplan.Status.PodStatus == "FAILED" {
-					myLog(parent, "WARN", "Failed to run TerraformPlan")
 				} else {
-					// Wait for plan to complete.
+					myLog(parent, "WARN", "Found TerraformPlan with non-matching parent sig.")
+					return &status, &desiredChildren, nil
 				}
-			} else {
-				myLog(parent, "WARN", "Found TerraformPlan with non-matching parent sig.")
-				return &status, &desiredChildren, nil
 			}
 		}
 
@@ -108,11 +116,51 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 				if tfapply.Status.PodStatus == "COMPLETED" {
 					status.Provisioning = appdbv1.ProvisioningStatusComplete
 
+					// Get the "name" output variable.
 					if nameVar, ok := tfapply.Status.TFOutput["name"]; ok == false {
-						myLog(parent, "ERROR", fmt.Sprintf("Output variable 'name' not found in status of TerraformApply: %s", tfapply.ObjectMeta.Name))
+						myLog(parent, "ERROR", fmt.Sprintf("Output variable 'name' not found in status of TerraformApply: %s", tfapply.GetName()))
 					} else {
 						status.CloudSQL.InstanceName = nameVar.Value
 					}
+
+					// Get the "connection" output variable.
+					if connVar, ok := tfapply.Status.TFOutput["connection"]; ok == false {
+						myLog(parent, "ERROR", fmt.Sprintf("Output variable 'connection' not found in status of TerraformApply: %s", tfapply.GetName()))
+					} else {
+						status.CloudSQL.ConnectionName = connVar.Value
+					}
+
+					// Get the "port" output variable.
+					if portVar, ok := tfapply.Status.TFOutput["port"]; ok == false {
+						myLog(parent, "ERROR", fmt.Sprintf("Output variable 'port' not found in status of TerraformApply: %s", tfapply.GetName()))
+					} else {
+						port, err := strconv.Atoi(portVar.Value)
+						if err != nil {
+							myLog(parent, "ERROR", fmt.Sprintf("Output variable 'port' could not be parsed as int: %s", portVar.Value))
+						}
+						status.CloudSQL.Port = int32(port)
+					}
+
+					// Create the Cloud SQL Proxy
+					deploy, svc, err := makeCloudSQLProxy(parent)
+					if err != nil {
+						myLog(parent, "ERROR", fmt.Sprintf("Failed to generate cloud sql proxy spec: %v", err))
+					} else {
+						if _, ok := children.Deployments[deploy.GetName()]; ok == false {
+							myLog(parent, "INFO", fmt.Sprintf("Creating Cloud SQL Proxy deployment: %s", deploy.GetName()))
+							desiredDeployments[deploy.GetName()] = true
+							desiredChildren = append(desiredChildren, deploy)
+						}
+
+						if _, ok := children.Services[svc.GetName()]; ok == false {
+							myLog(parent, "INFO", fmt.Sprintf("Creating Cloud SQL Proxy service: %s", svc.GetName()))
+							desiredServices[svc.GetName()] = true
+							desiredChildren = append(desiredChildren, svc)
+						}
+
+						status.CloudSQL.ProxyService = svc.GetName()
+					}
+
 				} else if tfapply.Status.PodStatus == "FAILED" {
 					status.Provisioning = appdbv1.ProvisioningStatusFailed
 				} else {
@@ -168,28 +216,28 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 
 		// Claim new terraformapplys else claim existing.
 		for _, o := range children.TerraformApplys {
-			if desiredTFApplys[o.Name] == false {
+			if desiredTFApplys[o.GetName()] == false {
 				desiredChildren = append(desiredChildren, o)
 			}
 		}
 
 		// Claim new terraformplans else claim existing.
 		for _, o := range children.TerraformPlans {
-			if desiredTFPlans[o.Name] == false {
+			if desiredTFPlans[o.GetName()] == false {
 				desiredChildren = append(desiredChildren, o)
 			}
 		}
 
 		// Claim new deployments else claim existing.
 		for _, o := range children.Deployments {
-			if desiredDeployments[o.Name] == false {
+			if desiredDeployments[o.GetName()] == false {
 				desiredChildren = append(desiredChildren, o)
 			}
 		}
 
 		// Claim new services else claim existing.
 		for _, o := range children.Services {
-			if desiredServices[o.Name] == false {
+			if desiredServices[o.GetName()] == false {
 				desiredChildren = append(desiredChildren, o)
 			}
 		}

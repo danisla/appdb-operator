@@ -1,14 +1,17 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 	tfv1 "github.com/danisla/terraform-operator/pkg/types"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -74,7 +77,7 @@ func getCloudSQLTerraformManifest(srcPath string) (string, error) {
 		return string(manifest), err
 	}
 
-	return base64.StdEncoding.EncodeToString(manifest), err
+	return string(manifest), err
 }
 
 func makeTFVars(name string, cfg *appdbv1.AppDBCloudSQLTerraformDriver) (map[string]string, error) {
@@ -101,4 +104,117 @@ func makeTFVars(name string, cfg *appdbv1.AppDBCloudSQLTerraformDriver) (map[str
 	}
 
 	return tfvars, nil
+}
+
+func makeCloudSQLProxy(parent *appdbv1.AppDBInstance) (appsv1beta1.Deployment, corev1.Service, error) {
+	var deploy appsv1beta1.Deployment
+	var svc corev1.Service
+	var err error
+
+	// Verify required spec values
+	if parent.Spec.Driver.CloudSQLTerraform.Proxy.ServiceAccount.Name == "" {
+		return deploy, svc, fmt.Errorf("Missing spec.driver.cloudSQLTerraform.proxy.serviceAccount.name")
+	}
+	if parent.Spec.Driver.CloudSQLTerraform.Proxy.ServiceAccount.Key == "" {
+		return deploy, svc, fmt.Errorf("Missing spec.driver.cloudSQLTerraform.proxy.serviceAccount.key")
+	}
+
+	name := fmt.Sprintf("%s-proxy", parent.Name)
+
+	namespace := parent.GetNamespace()
+
+	selector := map[string]string{"app": name}
+
+	replicas := parent.Spec.Driver.CloudSQLTerraform.Proxy.Replicas
+
+	saKeyContainerPath := "/var/run/secrets/cloudsql/sa-key.json"
+
+	cmdStr := fmt.Sprintf("/cloud_sql_proxy -instances=%s=tcp:0.0.0.0:%d -credential_file=%s", parent.Status.CloudSQL.ConnectionName, parent.Status.CloudSQL.Port, saKeyContainerPath)
+
+	deploy = appsv1beta1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps/v1beta1",
+			Kind:       "Deployment",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1beta1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: selector,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: selector,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name:            "cloudsql-proxy",
+							Image:           config.CloudSQLProxyImage,
+							ImagePullPolicy: config.CLoudSQLProxyImagePullPolicy,
+							Command:         strings.Split(cmdStr, " "),
+							VolumeMounts: []corev1.VolumeMount{
+								corev1.VolumeMount{
+									Name:      "sa-key",
+									MountPath: "/var/run/secrets/cloudsql",
+								},
+							},
+							Ports: []corev1.ContainerPort{
+								corev1.ContainerPort{
+									Name:          "sql",
+									ContainerPort: parent.Status.CloudSQL.Port,
+								},
+							},
+						},
+					}, // Containers
+					Volumes: []corev1.Volume{
+						corev1.Volume{
+							Name: "sa-key",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: parent.Spec.Driver.CloudSQLTerraform.Proxy.ServiceAccount.Name,
+									Items: []corev1.KeyToPath{
+										corev1.KeyToPath{
+											Key:  parent.Spec.Driver.CloudSQLTerraform.Proxy.ServiceAccount.Key,
+											Path: "sa-key.json",
+										},
+									},
+								},
+							},
+						},
+					}, // Volumes
+				}, // PodSpec
+			}, // PodTemplateSpec
+		}, // DeploymentSpec
+	} // Deployment
+
+	svc = corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Service",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{
+				corev1.ServicePort{
+					Name: "sql",
+					Port: parent.Status.CloudSQL.Port,
+					TargetPort: intstr.IntOrString{
+						Type:   intstr.String,
+						StrVal: "sql",
+					},
+				},
+			},
+			Selector: selector,
+		},
+	}
+
+	return deploy, svc, err
 }

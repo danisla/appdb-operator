@@ -22,6 +22,9 @@ type AppDBInstanceOperatorStatus struct {
 // AppDBInstanceCloudSQLStatus is the status structure for the CloudSQL driver
 type AppDBInstanceCloudSQLStatus struct {
 	InstanceName   string `json:"instanceName,omitempty"`
+	ConnectionName string `json:"connectionName,omitempty"`
+	Port           int32  `json:"port,omitempty"`
+	ProxyService   string `json:"proxyService,omitempty"`
 	TFApplyName    string `json:"tfapplyName,omitempty"`
 	TFApplyPodName string `json:"tfapplyPodName,omitempty"`
 	TFApplySig     string `json:"tfapplySig,omitempty"`
@@ -48,7 +51,14 @@ type AppDBCloudSQLTerraformDriver struct {
 
 // CloudSQLProxySpec is the spec for a cloudsql proxy
 type CloudSQLProxySpec struct {
-	Image           string            `json:"image",omitempty`
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-	Replicas        int               `json:"replicas,omitempty"`
+	Image           string                  `json:"image",omitempty`
+	ImagePullPolicy corev1.PullPolicy       `json:"imagePullPolicy,omitempty"`
+	Replicas        int32                   `json:"replicas,omitempty"`
+	ServiceAccount  CloudSQLProxySecretSpec `json:"serviceAccount,omitempty"`
+}
+
+// CloudSQLProxySecretSpec is the spec for providing the service account for the Cloud SQL Proxy
+type CloudSQLProxySecretSpec struct {
+	Name string `json:"name,omitempty"`
+	Key  string `json:"key,omitempty"`
 }

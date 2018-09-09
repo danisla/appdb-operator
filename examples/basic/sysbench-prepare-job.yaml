@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sysbench-prepare
+spec:
+  template:
+    metadata:
+      name: sysbench-prepare
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: sysbench-prepare
+        image: severalnines/sysbench
+        command:
+        - sysbench
+        - --db-driver=mysql
+        - --oltp-table-size=100000
+        - --oltp-tables-count=24
+        - --threads=1
+        - --mysql-host=$(DB_HOST)
+        - --mysql-port=$(DB_PORT)
+        - --mysql-user=$(DB_USER)
+        - --mysql-password=$(DB_PASSWORD)
+        - /usr/share/sysbench/tests/include/oltp_legacy/parallel_prepare.lua
+        - run
+        env:
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: appdb-sbtest-user-0
+              key: dbhost
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: appdb-sbtest-user-0
+              key: dbport
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: appdb-sbtest-user-0
+              key: user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: appdb-sbtest-user-0
+              key: password

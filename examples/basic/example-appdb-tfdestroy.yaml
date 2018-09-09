@@ -1,0 +1,14 @@
+apiVersion: ctl.isla.solutions/v1
+kind: TerraformDestroy
+metadata:
+  name: appdb-example-sbtest
+spec:
+  backendBucket: {{BACKEND_BUCKET}}
+  backendPrefix: terraform
+  providerConfig:
+    google:
+      secretName: tf-provider-google
+  sources:
+  - tfapply: appdb-example-sbtest
+  tfvarsFrom:
+  - tfapply: appdb-example-sbtest

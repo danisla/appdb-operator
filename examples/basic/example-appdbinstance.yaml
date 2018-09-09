@@ -1,0 +1,19 @@
+apiVersion: ctl.isla.solutions/v1
+kind: AppDBInstance
+metadata:
+  name: example
+spec:
+  driver:
+    cloudSQLTerraform:
+      params:
+        region: "us-central1"
+        database_version: "MYSQL_5_6"
+        tier: "db-f1-micro"
+        disk_size_gb: "10"
+        disk_type: "PD_SSD"
+      proxy:
+        image: gcr.io/cloudsql-docker/gce-proxy:1.11
+        replicas: 1
+        serviceAccount:
+          name: tf-provider-google
+          key: GOOGLE_CREDENTIALS

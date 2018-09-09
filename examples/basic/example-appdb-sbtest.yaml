@@ -1,0 +1,9 @@
+apiVersion: ctl.isla.solutions/v1
+kind: AppDB
+metadata:
+  name: sbtest
+spec:
+  appDBInstance: example
+  dbName: sbtest
+  users:
+  - sbtest

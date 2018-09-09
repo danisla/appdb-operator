@@ -2,13 +2,5 @@ apiVersion: ctl.isla.solutions/v1
 kind: TerraformDestroy
 metadata:
   name: appdbi-example
-spec:
-  backendBucket: {{BACKEND_BUCKET}}
-  backendPrefix: terraform
-  providerConfig:
-    google:
-      secretName: tf-provider-google
-  sources:
-  - tfapply: appdbi-example
-  tfvarsFrom:
-  - tfapply: appdbi-example
+specFrom:
+  tfapply: appdbi-example

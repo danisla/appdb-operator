@@ -143,8 +143,7 @@ kubectl delete job sysbench-prepare
 2. Delete the App Database and user using the `example-appdb-tfdestroy.yaml` file:
 
 ```
-BACKEND_BUCKET=$(gcloud config get-value project)-appdb-operator
-sed -e "s/{{BACKEND_BUCKET}}/${BACKEND_BUCKET}/g" example-appdb-tfdestroy.yaml | kubectl apply -f - && \
+kubectl apply -f example-appdb-tfdestroy.yaml && \
   ( until [[ $(kubectl get tfdestroy appdb-example-sbtest -o jsonpath='{.status.podStatus}') == "COMPLETED" ]]; do echo "Waiting for TerraformDestroy to complete..."; sleep 2; done && echo "TerraformDestroy complete" ) && \
   kubectl delete tfdestroy appdb-example-sbtest
 ```
@@ -158,8 +157,8 @@ kubectl delete appdb sbtest
 4. Delete the App Datbase Instance using the `example-appdbinstance-tfdestroy.yaml` file:
 
 ```
-BACKEND_BUCKET=$(gcloud config get-value project)-appdb-operator
-sed -e "s/{{BACKEND_BUCKET}}/${BACKEND_BUCKET}/g" example-appdbinstance-tfdestroy.yaml | kubectl apply -f - && \
+
+kubectl apply -f example-appdbinstance-tfdestroy.yaml && \
   ( until [[ $(kubectl get tfdestroy appdbi-example -o jsonpath='{.status.podStatus}') == "COMPLETED" ]]; do echo "Waiting for TerraformDestroy to complete..."; sleep 2; done && echo "TerraformDestroy complete" ) && \
   kubectl delete tfdestroy appdbi-example
 ```

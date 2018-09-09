@@ -157,7 +157,6 @@ kubectl delete appdb sbtest
 4. Delete the App Datbase Instance using the `example-appdbinstance-tfdestroy.yaml` file:
 
 ```
-
 kubectl apply -f example-appdbinstance-tfdestroy.yaml && \
   ( until [[ $(kubectl get tfdestroy appdbi-example -o jsonpath='{.status.podStatus}') == "COMPLETED" ]]; do echo "Waiting for TerraformDestroy to complete..."; sleep 2; done && echo "TerraformDestroy complete" ) && \
   kubectl delete tfdestroy appdbi-example

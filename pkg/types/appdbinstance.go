@@ -53,14 +53,7 @@ type AppDBCloudSQLTerraformDriver struct {
 
 // CloudSQLProxySpec is the spec for a cloudsql proxy
 type CloudSQLProxySpec struct {
-	Image           string                  `json:"image",omitempty`
-	ImagePullPolicy corev1.PullPolicy       `json:"imagePullPolicy,omitempty"`
-	Replicas        int32                   `json:"replicas,omitempty"`
-	ServiceAccount  CloudSQLProxySecretSpec `json:"serviceAccount,omitempty"`
-}
-
-// CloudSQLProxySecretSpec is the spec for providing the service account for the Cloud SQL Proxy
-type CloudSQLProxySecretSpec struct {
-	Name string `json:"name,omitempty"`
-	Key  string `json:"key,omitempty"`
+	Image           string            `json:"image",omitempty`
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+	Replicas        int32             `json:"replicas,omitempty"`
 }

@@ -32,4 +32,5 @@ type AppDBInstanceChildren struct {
 	TerraformPlans  map[string]tfv1.Terraform         `json:"Terraformplan.ctl.isla.solutions/v1"`
 	Services        map[string]corev1.Service         `json:"Service.v1"`
 	Deployments     map[string]appsv1beta1.Deployment `json:"Deployment.apps/v1beta1"`
+	Secrets         map[string]corev1.Secret          `json:"Secret.v1"`
 }

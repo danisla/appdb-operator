@@ -14,4 +14,3 @@ RUN curl -sfSL https://storage.googleapis.com/kubernetes-release/release/v1.11.0
 COPY --from=build /go/bin/appdb-instance-operator /usr/bin/
 COPY --from=build /go/bin/appdb-operator /usr/bin/
 COPY config/ /config/
-CMD ["/usr/bin/appdb-operator"]

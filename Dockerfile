@@ -15,3 +15,4 @@ RUN apk add --update ca-certificates bash curl
 RUN curl -sfSL https://storage.googleapis.com/kubernetes-release/release/v1.11.0/bin/linux/amd64/kubectl > /usr/bin/kubectl && chmod +x /usr/bin/kubectl
 COPY --from=build /go/bin/appdb-instance-operator /usr/bin/
 COPY --from=build /go/bin/appdb-operator /usr/bin/
+COPY config/ /config/

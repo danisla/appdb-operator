@@ -53,11 +53,13 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 
 	if appdbi.Spec.Driver.CloudSQLTerraform != nil {
 
-		tfApplyName := fmt.Sprintf("%s-%s", appdbi.GetName(), parent.Name)
+		tfApplyName := fmt.Sprintf("appdb-%s-%s", appdbi.GetName(), parent.Name)
 
 		if tfapply, ok := children.TerraformApplys[tfApplyName]; ok == true {
 			if status.CloudSQLDB == nil {
 				myLog(parent, "WARN", "Found TerraformPlan in children, but status.CloudSQLDB was nil, re-sync collision.")
+				// Delete TerraformApply and try again
+				desiredTFApplys[tfApplyName] = true
 			} else {
 
 				mySig := calcParentSig(parent.Spec, "")
@@ -72,18 +74,22 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 
 						// Generate secret for DB credentials.
 						if passwordsVar, ok := tfapply.Status.TFOutput["user_passwords"]; ok == true {
-							secretName := status.CloudSQLDB.TFApplyName
 
 							passwords := strings.Split(passwordsVar.Value, ",")
 							if len(parent.Spec.Users) != len(passwords) {
 								myLog(parent, "ERROR", "passwords output from TerraformApply is different length than input users.")
 							} else {
-								secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users, passwords, appdbi.Status.DBHost, appdbi.Status.DBPort)
+								status.CredentialsSecrets = make(map[string]string, 0)
+								for i := 0; i < len(parent.Spec.Users); i++ {
+									secretName := fmt.Sprintf("appdb-%s-user-%d", parent.GetName(), i)
 
-								desiredSecrets[secretName] = true
-								desiredChildren = append(desiredChildren, secret)
+									secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users[i], passwords[i], appdbi.Status.DBHost, appdbi.Status.DBPort)
 
-								status.CredentialsSecret = secretName
+									status.CredentialsSecrets[parent.Spec.Users[i]] = secretName
+
+									desiredSecrets[secretName] = true
+									desiredChildren = append(desiredChildren, secret)
+								}
 							}
 						} else {
 							myLog(parent, "ERROR", "No user_passwords found in output varibles of TerraformApply status")

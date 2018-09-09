@@ -6,10 +6,10 @@ import (
 
 // AppDBOperatorStatus is the status structure for the custom resource
 type AppDBOperatorStatus struct {
-	Provisioning      string                 `json:"provisioning"`
-	AppDBInstanceSig  string                 `json:"appDBInstanceSig"`
-	CloudSQLDB        *AppDBCloudSQLDBStatus `json:"cloudSQLDB"`
-	CredentialsSecret string                 `json:"credentialsSecret"`
+	Provisioning       string                 `json:"provisioning"`
+	AppDBInstanceSig   string                 `json:"appDBInstanceSig"`
+	CloudSQLDB         *AppDBCloudSQLDBStatus `json:"cloudSQLDB"`
+	CredentialsSecrets map[string]string      `json:"credentialsSecrets"`
 }
 
 // AppDBCloudSQLDBStatus is the status structure for the CloudSQL driver

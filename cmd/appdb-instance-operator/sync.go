@@ -21,13 +21,17 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 
 	if parent.Spec.Driver.CloudSQLTerraform != nil {
 
-		tfApplyName := parent.Name
+		tfApplyName := fmt.Sprintf("appdbi-%s", parent.Name)
 		planRunning := false
 
 		if tfplan, ok := children.TerraformPlans[tfApplyName]; ok == true {
 
+			status.Provisioning = appdbv1.ProvisioningStatusPending
+
 			if status.CloudSQL == nil {
 				myLog(parent, "WARN", "Found TerraformPlan in children, but status.CloudSQL was nil, re-sync collision.")
+				// Delete TerraformPlan and try again.
+				desiredTFPlans[tfApplyName] = true
 			} else {
 
 				// Handle terraform plan

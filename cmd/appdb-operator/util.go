@@ -37,17 +37,15 @@ func getAppDBInstance(namespace string, name string) (appdbv1.AppDBInstance, err
 	return appdbi, err
 }
 
-func makeCredentialsSecret(name string, namespace string, users []string, passwords []string, dbhost string, dbport int32) corev1.Secret {
+func makeCredentialsSecret(name string, namespace string, user string, password string, dbhost string, dbport int32) corev1.Secret {
 	var secret corev1.Secret
 
 	data := make(map[string]string, 0)
 
 	data["dbhost"] = dbhost
 	data["dbport"] = fmt.Sprintf("%d", dbport)
-
-	for i := 0; i < len(users); i++ {
-		data[users[i]] = passwords[i]
-	}
+	data["user"] = user
+	data["password"] = password
 
 	secret = corev1.Secret{
 		TypeMeta: metav1.TypeMeta{

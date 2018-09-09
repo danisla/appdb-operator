@@ -80,8 +80,8 @@ export TEST_CLOUDSQL_DESTROY
 tests/db%-cloudsql-tfdestroy.yaml: backend_bucket
 	@mkdir -p tests
 	@echo "$${TEST_CLOUDSQL_DESTROY}" | \
-	sed -e "s/{{NAME}}/db$*-cloudsql/g" \
-	    -e "s/{{SRC_TFAPPLY}}/db$*-cloudsql/g" \
+	sed -e "s/{{NAME}}/appdbi-db$*-cloudsql/g" \
+	    -e "s/{{SRC_TFAPPLY}}/appdbi-db$*-cloudsql/g" \
       -e "s/{{BACKEND_BUCKET}}/$(BACKEND_BUCKET)/g" \
 	    -e "s/{{BACKEND_PREFIX}}/terraform/g" \
 	    -e "s/{{GOOGLE_PROVIDER_SECRET_NAME}}/$(GOOGLE_PROVIDER_SECRET_NAME)/g" \
@@ -91,8 +91,8 @@ export TEST_CLOUDSQL_DESTROY
 tests/db1-app%-appdb-tfdestroy.yaml: backend_bucket
 	@mkdir -p tests
 	@echo "$${TEST_CLOUDSQL_DESTROY}" | \
-	sed -e "s/{{NAME}}/db1-cloudsql-app$*/g" \
-	    -e "s/{{SRC_TFAPPLY}}/db1-cloudsql-app$*/g" \
+	sed -e "s/{{NAME}}/appdb-db1-cloudsql-app$*/g" \
+	    -e "s/{{SRC_TFAPPLY}}/appdb-db1-cloudsql-app$*/g" \
       -e "s/{{BACKEND_BUCKET}}/$(BACKEND_BUCKET)/g" \
 	    -e "s/{{BACKEND_PREFIX}}/terraform/g" \
 	    -e "s/{{GOOGLE_PROVIDER_SECRET_NAME}}/$(GOOGLE_PROVIDER_SECRET_NAME)/g" \

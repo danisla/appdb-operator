@@ -78,7 +78,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 							if len(parent.Spec.Users) != len(passwords) {
 								myLog(parent, "ERROR", "passwords output from TerraformApply is different length than input users.")
 							} else {
-								secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users, passwords)
+								secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users, passwords, appdbi.Status.DBHost, appdbi.Status.DBPort)
 
 								desiredSecrets[secretName] = true
 								desiredChildren = append(desiredChildren, secret)

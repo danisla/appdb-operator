@@ -159,6 +159,9 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 						}
 
 						status.CloudSQL.ProxyService = svc.GetName()
+
+						status.DBHost = fmt.Sprintf("%s.%s.svc.cluster.local", svc.GetName(), svc.GetNamespace())
+						status.DBPort = status.CloudSQL.Port
 					}
 
 				} else if tfapply.Status.PodStatus == "FAILED" {

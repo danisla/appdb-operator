@@ -16,6 +16,8 @@ type AppDBInstance struct {
 // AppDBInstanceOperatorStatus is the status structure for the custom resource
 type AppDBInstanceOperatorStatus struct {
 	Provisioning string                       `json:"provisioning"`
+	DBHost       string                       `json:"dbHost"`
+	DBPort       int32                        `json:"dbPort"`
 	CloudSQL     *AppDBInstanceCloudSQLStatus `json:"cloudSQL"`
 }
 

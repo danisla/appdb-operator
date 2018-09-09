@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -106,18 +107,11 @@ func makeTFVars(name string, cfg *appdbv1.AppDBCloudSQLTerraformDriver) (map[str
 	return tfvars, nil
 }
 
-func makeCloudSQLProxy(parent *appdbv1.AppDBInstance) (appsv1beta1.Deployment, corev1.Service, error) {
+func makeCloudSQLProxy(parent *appdbv1.AppDBInstance, tfapply tfv1.Terraform) (corev1.Secret, appsv1beta1.Deployment, corev1.Service, error) {
+	var secret corev1.Secret
 	var deploy appsv1beta1.Deployment
 	var svc corev1.Service
 	var err error
-
-	// Verify required spec values
-	if parent.Spec.Driver.CloudSQLTerraform.Proxy.ServiceAccount.Name == "" {
-		return deploy, svc, fmt.Errorf("Missing spec.driver.cloudSQLTerraform.proxy.serviceAccount.name")
-	}
-	if parent.Spec.Driver.CloudSQLTerraform.Proxy.ServiceAccount.Key == "" {
-		return deploy, svc, fmt.Errorf("Missing spec.driver.cloudSQLTerraform.proxy.serviceAccount.key")
-	}
 
 	name := fmt.Sprintf("%s-proxy", parent.Name)
 
@@ -130,6 +124,30 @@ func makeCloudSQLProxy(parent *appdbv1.AppDBInstance) (appsv1beta1.Deployment, c
 	saKeyContainerPath := "/var/run/secrets/cloudsql/sa-key.json"
 
 	cmdStr := fmt.Sprintf("/cloud_sql_proxy -instances=%s=tcp:0.0.0.0:%d -credential_file=%s", parent.Status.CloudSQL.ConnectionName, parent.Status.CloudSQL.Port, saKeyContainerPath)
+
+	// Extract service account key from TerraformApply output variable base64 encoded value.
+	if saKeyOutput, ok := tfapply.Status.TFOutput["sa_key"]; ok == true {
+		saKey, err := base64.StdEncoding.DecodeString(saKeyOutput.Value)
+		if err != nil {
+			return secret, deploy, svc, fmt.Errorf("Failed to decode 'sa_key' value from TerraformApply output var: %v", err)
+		}
+
+		secret = corev1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "Secret",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+			},
+			StringData: map[string]string{
+				"sa-key.json": string(saKey),
+			},
+		}
+	} else {
+		return secret, deploy, svc, fmt.Errorf("Missing 'sa_key' in TerraformApply output")
+	}
 
 	deploy = appsv1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -175,13 +193,7 @@ func makeCloudSQLProxy(parent *appdbv1.AppDBInstance) (appsv1beta1.Deployment, c
 							Name: "sa-key",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: parent.Spec.Driver.CloudSQLTerraform.Proxy.ServiceAccount.Name,
-									Items: []corev1.KeyToPath{
-										corev1.KeyToPath{
-											Key:  parent.Spec.Driver.CloudSQLTerraform.Proxy.ServiceAccount.Key,
-											Path: "sa-key.json",
-										},
-									},
+									SecretName: name,
 								},
 							},
 						},
@@ -216,5 +228,5 @@ func makeCloudSQLProxy(parent *appdbv1.AppDBInstance) (appsv1beta1.Deployment, c
 		},
 	}
 
-	return deploy, svc, err
+	return secret, deploy, svc, err
 }

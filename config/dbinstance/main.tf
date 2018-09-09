@@ -23,9 +23,11 @@ resource "random_id" "name" {
 }
 
 locals {
-  project = "${var.project == "" ? data.google_client_config.current.project : var.project }"
-  name    = "${var.name}-${random_id.name.hex}"
-  port = "${substr(var.database_version, 0, 5) == "MYSQL" ? "3306" : "5432"}"
+  project  = "${var.project == "" ? data.google_client_config.current.project : var.project }"
+  name     = "${var.name}-${random_id.name.hex}"
+  port     = "${substr(var.database_version, 0, 5) == "MYSQL" ? "3306" : "5432"}"
+  sa_key   = "${google_service_account_key.cloudsql-proxy.private_key}"
+  sa_email = "${google_service_account.cloudsql-proxy.email}"
 }
 
 module "db-instance" {
@@ -40,6 +42,23 @@ module "db-instance" {
   disk_type        = "${var.disk_type}"
 }
 
+resource "google_service_account" "cloudsql-proxy" {
+  project      = "${var.project}"
+  account_id   = "${local.name}-proxy"
+  display_name = "${local.name} Cloud SQL Proxy"
+}
+
+resource "google_service_account_key" "cloudsql-proxy" {
+  service_account_id = "${google_service_account.cloudsql-proxy.name}"
+  public_key_type    = "TYPE_X509_PEM_FILE"
+}
+
+resource "google_project_iam_member" "editor" {
+  project = "${var.project}"
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${local.sa_email}"
+}
+
 output "name" {
   value = "${local.name}"
 }
@@ -49,9 +68,19 @@ output "connection" {
 }
 
 output "admin_pass" {
-  value = "${module.db-instance.generated_user_password}"
+  value     = "${module.db-instance.generated_user_password}"
+  sensitive = true
 }
 
 output "port" {
   value = "${local.port}"
+}
+
+output "sa_email" {
+  value = "${local.sa_email}"
+}
+
+output "sa_key" {
+  value     = "${local.sa_key}"
+  sensitive = true
 }

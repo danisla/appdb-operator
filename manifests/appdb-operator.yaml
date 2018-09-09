@@ -25,6 +25,8 @@ spec:
     resource: appdbinstances
   childResources:
   - apiVersion: v1
+    resource: secrets
+  - apiVersion: v1
     resource: services
   - apiVersion: apps/v1beta1
     resource: deployments

@@ -15,6 +15,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 
 	desiredTFApplys := make(map[string]bool, 0)
 	desiredTFPlans := make(map[string]bool, 0)
+	desiredSecrets := make(map[string]bool, 0)
 	desiredDeployments := make(map[string]bool, 0)
 	desiredServices := make(map[string]bool, 0)
 	desiredChildren := make([]interface{}, 0)
@@ -146,16 +147,26 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 					}
 
 					// Create the Cloud SQL Proxy
-					deploy, svc, err := makeCloudSQLProxy(parent)
+					secret, deploy, svc, err := makeCloudSQLProxy(parent, tfapply)
 					if err != nil {
 						myLog(parent, "ERROR", fmt.Sprintf("Failed to generate cloud sql proxy spec: %v", err))
 					} else {
+
+						// Cloud SQL Proxy Service Account Key Secret
+						if _, ok := children.Secrets[secret.GetName()]; ok == false {
+							myLog(parent, "INFO", fmt.Sprintf("Creating Cloud SQL Proxy secret: %s", secret.GetName()))
+							desiredSecrets[secret.GetName()] = true
+							desiredChildren = append(desiredChildren, secret)
+						}
+
+						// Cloud SQL Proxy Deployment
 						if _, ok := children.Deployments[deploy.GetName()]; ok == false {
 							myLog(parent, "INFO", fmt.Sprintf("Creating Cloud SQL Proxy deployment: %s", deploy.GetName()))
 							desiredDeployments[deploy.GetName()] = true
 							desiredChildren = append(desiredChildren, deploy)
 						}
 
+						// Cloud SQL Proxy Service
 						if _, ok := children.Services[svc.GetName()]; ok == false {
 							myLog(parent, "INFO", fmt.Sprintf("Creating Cloud SQL Proxy service: %s", svc.GetName()))
 							desiredServices[svc.GetName()] = true
@@ -231,6 +242,13 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 		// Claim new terraformplans else claim existing.
 		for _, o := range children.TerraformPlans {
 			if desiredTFPlans[o.GetName()] == false {
+				desiredChildren = append(desiredChildren, o)
+			}
+		}
+
+		// Claim new secrets else claim existing.
+		for _, o := range children.Secrets {
+			if desiredSecrets[o.GetName()] == false {
 				desiredChildren = append(desiredChildren, o)
 			}
 		}

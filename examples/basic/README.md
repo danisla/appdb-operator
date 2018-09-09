@@ -64,7 +64,7 @@ kubectl plugin terraform configure
 cat example-appdbinstance.yaml
 ```
 
-> Note that in this example, the `tf-provider-google` credentials used for the Cloud SQL Proxy are shared with the terraform-operator.
+> Note that the `params` key value pairs are all string values. These are passed through to the Terraform manifest that creates the database and service account for the Cloud SQL Proxy.
 
 2. Inspect the `example-appdb-sbtest.yaml` file:
 

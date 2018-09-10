@@ -3,6 +3,7 @@ package main
 import (
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 	tfv1 "github.com/danisla/terraform-operator/pkg/types"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -29,4 +30,5 @@ type SyncResponse struct {
 type AppDBChildren struct {
 	TerraformApplys map[string]tfv1.Terraform `json:"Terraformapply.ctl.isla.solutions/v1"`
 	Secrets         map[string]corev1.Secret  `json:"Secret.v1"`
+	Jobs            map[string]batchv1.Job    `json:"Job.batch/v1"`
 }

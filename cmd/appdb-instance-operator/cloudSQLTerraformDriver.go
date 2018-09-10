@@ -42,7 +42,7 @@ func makeCloudSQLTerraform(tfApplyName string, parent *appdbv1.AppDBInstance) (t
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tfApplyName,
-			Namespace: parent.Namespace,
+			Namespace: parent.GetNamespace(),
 			Annotations: map[string]string{
 				"appdb-parent-sig": parentSig,
 			},
@@ -126,10 +126,10 @@ func makeCloudSQLProxy(parent *appdbv1.AppDBInstance, tfapply tfv1.Terraform) (c
 	cmdStr := fmt.Sprintf("/cloud_sql_proxy -instances=%s=tcp:0.0.0.0:%d -credential_file=%s", parent.Status.CloudSQL.ConnectionName, parent.Status.CloudSQL.Port, saKeyContainerPath)
 
 	// Extract service account key from TerraformApply output variable base64 encoded value.
-	if saKeyOutput, ok := tfapply.Status.TFOutput["sa_key"]; ok == true {
+	if saKeyOutput, ok := tfapply.Status.TFOutput["proxy_sa_key"]; ok == true {
 		saKey, err := base64.StdEncoding.DecodeString(saKeyOutput.Value)
 		if err != nil {
-			return secret, deploy, svc, fmt.Errorf("Failed to decode 'sa_key' value from TerraformApply output var: %v", err)
+			return secret, deploy, svc, fmt.Errorf("Failed to decode 'proxy_sa_key' value from TerraformApply output var: %v", err)
 		}
 
 		secret = corev1.Secret{
@@ -146,7 +146,7 @@ func makeCloudSQLProxy(parent *appdbv1.AppDBInstance, tfapply tfv1.Terraform) (c
 			},
 		}
 	} else {
-		return secret, deploy, svc, fmt.Errorf("Missing 'sa_key' in TerraformApply output")
+		return secret, deploy, svc, fmt.Errorf("Missing 'proxy_sa_key' in TerraformApply output")
 	}
 
 	deploy = appsv1beta1.Deployment{

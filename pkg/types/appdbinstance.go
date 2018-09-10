@@ -27,6 +27,7 @@ type AppDBInstanceCloudSQLStatus struct {
 	ConnectionName string `json:"connectionName,omitempty"`
 	Port           int32  `json:"port,omitempty"`
 	ProxyService   string `json:"proxyService,omitempty"`
+	ProxySecret    string `json:"proxySecret,omitempty"`
 	TFApplyName    string `json:"tfapplyName,omitempty"`
 	TFApplyPodName string `json:"tfapplyPodName,omitempty"`
 	TFApplySig     string `json:"tfapplySig,omitempty"`

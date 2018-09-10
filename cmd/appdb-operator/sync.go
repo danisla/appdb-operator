@@ -17,6 +17,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 
 	desiredTFApplys := make(map[string]bool, 0)
 	desiredSecrets := make(map[string]bool, 0)
+	desiredJobs := make(map[string]bool, 0)
 	desiredChildren := make([]interface{}, 0)
 
 	if parent.Spec.AppDBInstance == "" {
@@ -28,6 +29,12 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 	if parent.Spec.DBName == "" {
 		// Must have DBName
 		myLog(parent, "ERROR", "Missing dbName")
+		return &status, &desiredChildren, nil
+	}
+
+	if len(parent.Spec.Users) == 0 {
+		// Must have at least 1 user
+		myLog(parent, "ERROR", "Users list is empty")
 		return &status, &desiredChildren, nil
 	}
 
@@ -70,7 +77,6 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 					status.CloudSQLDB.TFApplyPodName = tfapply.Status.PodName
 
 					if tfapply.Status.PodStatus == "COMPLETED" {
-						status.Provisioning = appdbv1.ProvisioningStatusComplete
 
 						// Generate secret for DB credentials.
 						if passwordsVar, ok := tfapply.Status.TFOutput["user_passwords"]; ok == true {
@@ -94,6 +100,29 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 						} else {
 							myLog(parent, "ERROR", "No user_passwords found in output varibles of TerraformApply status")
 						}
+
+						// Optionally load snapshot from GCS.
+						if parent.Spec.LoadSnapshot != "" {
+							jobName := fmt.Sprintf("appdb-%s-load", parent.GetName())
+							job := makeLoadSnapshotJob(jobName, parent.GetNamespace(), appdbi.Status.CloudSQL.InstanceName, parent.Spec.LoadSnapshot, parent.Spec.DBName, parent.Spec.Users[0], appdbi.Status.CloudSQL.ProxySecret)
+							if currJob, ok := children.Jobs[job.GetName()]; ok == false {
+								// Wait for load job to complete.
+								if currJob.Status.Succeeded == 1 {
+									// load complete.
+									status.Provisioning = appdbv1.ProvisioningStatusComplete
+								}
+							} else {
+								// Create job
+								desiredJobs[job.GetName()] = true
+								desiredChildren = append(desiredChildren, job)
+
+								myLog(parent, "INFO", fmt.Sprintf("Created SQL load job from snapshot %s: %s", parent.Spec.LoadSnapshot, job.GetName()))
+							}
+						} else {
+							// No load job, so done.
+							status.Provisioning = appdbv1.ProvisioningStatusComplete
+						}
+
 					} else if tfapply.Status.PodStatus == "FAILED" {
 						status.Provisioning = appdbv1.ProvisioningStatusFailed
 
@@ -121,7 +150,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 					} else {
 						if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
 							// found existing tfapply, apply changes to it.
-							err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
+							err = kubectlApply(parent.GetNamespace(), tfApplyName, tfapply)
 							if err != nil {
 								myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
 							} else {
@@ -169,6 +198,13 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 		// Claim new secrets else claim existing.
 		for _, o := range children.Secrets {
 			if desiredSecrets[o.Name] == false {
+				desiredChildren = append(desiredChildren, o)
+			}
+		}
+
+		// Claim new jobs else claim existing.
+		for _, o := range children.Jobs {
+			if desiredJobs[o.Name] == false {
 				desiredChildren = append(desiredChildren, o)
 			}
 		}

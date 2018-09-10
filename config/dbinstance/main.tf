@@ -26,8 +26,8 @@ locals {
   project  = "${var.project == "" ? data.google_client_config.current.project : var.project }"
   name     = "${var.name}-${random_id.name.hex}"
   port     = "${substr(var.database_version, 0, 5) == "MYSQL" ? "3306" : "5432"}"
-  sa_key   = "${google_service_account_key.cloudsql-proxy.private_key}"
-  sa_email = "${google_service_account.cloudsql-proxy.email}"
+  proxy_sa_key   = "${google_service_account_key.cloudsql-proxy.private_key}"
+  proxy_sa_email = "${google_service_account.cloudsql-proxy.email}"
 }
 
 module "db-instance" {
@@ -56,7 +56,7 @@ resource "google_service_account_key" "cloudsql-proxy" {
 resource "google_project_iam_member" "editor" {
   project = "${var.project}"
   role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${local.sa_email}"
+  member  = "serviceAccount:${local.proxy_sa_email}"
 }
 
 output "name" {
@@ -76,11 +76,11 @@ output "port" {
   value = "${local.port}"
 }
 
-output "sa_email" {
-  value = "${local.sa_email}"
+output "proxy_sa_email" {
+  value = "${local.proxy_sa_email}"
 }
 
-output "sa_key" {
-  value     = "${local.sa_key}"
+output "proxy_sa_key" {
+  value     = "${local.proxy_sa_key}"
   sensitive = true
 }

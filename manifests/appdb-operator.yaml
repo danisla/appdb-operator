@@ -68,6 +68,8 @@ spec:
   childResources:
   - apiVersion: v1
     resource: secrets
+  - apiVersion: batch/v1
+    resource: jobs
   - apiVersion: ctl.isla.solutions/v1
     resource: terraformapplys
   - apiVersion: ctl.isla.solutions/v1

@@ -73,7 +73,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 							} else {
 								if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
 									// found existing tfapply, apply changes to it.
-									err = kubectlApply(parent.Namespace, tfApplyName, tfapply)
+									err = kubectlApply(parent.GetNamespace(), tfApplyName, tfapply)
 									if err != nil {
 										myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
 									} else {
@@ -174,6 +174,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 						}
 
 						status.CloudSQL.ProxyService = svc.GetName()
+						status.CloudSQL.ProxySecret = secret.GetName()
 
 						status.DBHost = fmt.Sprintf("%s.%s.svc.cluster.local", svc.GetName(), svc.GetNamespace())
 						status.DBPort = status.CloudSQL.Port

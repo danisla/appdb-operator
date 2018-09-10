@@ -16,18 +16,25 @@ variable "disk_type" {
   default = "PD_SSD"
 }
 
-data "google_client_config" "current" {}
+variable "snapshot_bucket" {
+  description = "Optional bucket for snapshots. If not provided, the conventional name will be used in the form of: PROJECT_ID-appdb-operator"
+  default     = ""
+}
+
+data "google_project" "project" {}
 
 resource "random_id" "name" {
   byte_length = 2
 }
 
 locals {
-  project  = "${var.project == "" ? data.google_client_config.current.project : var.project }"
-  name     = "${var.name}-${random_id.name.hex}"
-  port     = "${substr(var.database_version, 0, 5) == "MYSQL" ? "3306" : "5432"}"
-  proxy_sa_key   = "${google_service_account_key.cloudsql-proxy.private_key}"
-  proxy_sa_email = "${google_service_account.cloudsql-proxy.email}"
+  project           = "${var.project == "" ? data.google_project.project.project_id : var.project }"
+  name              = "${var.name}-${random_id.name.hex}"
+  port              = "${substr(var.database_version, 0, 5) == "MYSQL" ? "3306" : "5432"}"
+  instance_sa_email = "${module.instance_sa_email.sa_email}"
+  proxy_sa_key      = "${google_service_account_key.cloudsql-proxy.private_key}"
+  proxy_sa_email    = "${google_service_account.cloudsql-proxy.email}"
+  snapshot_bucket   = "${var.snapshot_bucket == "" ? format("%s-appdb-operator", data.google_project.project.project_id) : var.snapshot_bucket}"
 }
 
 module "db-instance" {
@@ -59,6 +66,22 @@ resource "google_project_iam_member" "editor" {
   member  = "serviceAccount:${local.proxy_sa_email}"
 }
 
+module "instance_sa_email" {
+  source   = "github.com/danisla/terraform-google-sql-sa-email"
+  instance = "${basename(module.db-instance.self_link)}"
+  project  = "${var.project}"
+}
+
+// TODO: this is broken
+// resource "google_storage_bucket_acl" "snapshot-acl" {
+//   bucket = "${local.snapshot_bucket}"
+
+//   role_entity = [
+//     "OWNER:project-owners-${data.google_project.project.number}",
+//     "WRITER:${local.instance_sa_email}",
+//   ]
+// }
+
 output "name" {
   value = "${local.name}"
 }
@@ -74,6 +97,10 @@ output "admin_pass" {
 
 output "port" {
   value = "${local.port}"
+}
+
+output "instance_sa_email" {
+  value = "${local.instance_sa_email}"
 }
 
 output "proxy_sa_email" {

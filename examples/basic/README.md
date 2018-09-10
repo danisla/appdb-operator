@@ -50,6 +50,21 @@ kubectl plugin terraform configure
 
 3. Follow the prompts to configure the plugin.
 
+## Install and configure the appdb-operator
+
+1. Install the `appdb-operator`:
+
+```
+kubectl apply -f https://raw.githubusercontent.com/danisla/appdb-operator/master/manifests/appdb-operator-rbac.yaml
+kubectl apply -f https://raw.githubusercontent.com/danisla/appdb-operator/master/manifests/appdb-operator.yaml
+```
+
+2. Create GCS bucket for remote state and snapshots:
+
+```
+gsutil mb gs://$(gcloud config get-value project)-appdb-operator
+```
+
 ## Change to the example directory
 
 ```

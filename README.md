@@ -48,9 +48,15 @@ kubectl apply -f https://raw.githubusercontent.com/danisla/terraform-operator/ma
 
 ## Install the operator
 
-1. Deploy the manifest files for the operator:
+1. Install the `appdb-operator`:
 
 ```
-kubectl apply -f manifests/appdb-operator-rbac.yaml
-kubectl apply -f manifests/appdb-operator.yaml
+kubectl apply -f https://raw.githubusercontent.com/danisla/appdb-operator/master/manifests/appdb-operator-rbac.yaml
+kubectl apply -f https://raw.githubusercontent.com/danisla/appdb-operator/master/manifests/appdb-operator.yaml
+```
+
+2. Create GCS bucket for remote state and snapshots:
+
+```
+gsutil mb gs://$(gcloud config get-value project)-appdb-operator
 ```

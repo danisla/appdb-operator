@@ -68,7 +68,7 @@ gsutil mb gs://$(gcloud config get-value project)-appdb-operator
 ## Change to the example directory
 
 ```
-[[ `basename $PWD` != plugin ]] && cd examples/basic
+[[ `basename $PWD` != basic ]] && cd examples/basic
 ```
 
 ## Inspect the YAML spec files
@@ -98,7 +98,7 @@ kubectl apply -f example-appdbinstance.yaml && \
   kubectl apply -f example-appdb-sbtest.yaml
 ```
 
-3. Wait for the database instance and database provisioning to complete:
+2. Wait for the database instance and database provisioning to complete:
 
 ```
 (until [[ $(kubectl get appdbi example -o jsonpath='{.status.provisioning}') == "COMPLETE"  ]]; do echo "Waiting for AppDBInstance..."; sleep 2; done && echo "AppDBInstance is ready") && \
@@ -107,13 +107,13 @@ kubectl apply -f example-appdbinstance.yaml && \
 
 > Note, this step will take 4-7 minutes to complete. To monitor the terraform output, tail the logs from the `appdbi-example-tfapply-0` and `appdb-example-sbtest-tfapply-0` pods.
 
-4. Inspect the status of the `AppDBInstance` resource:
+3. Inspect the status of the `AppDBInstance` resource:
 
 ```
 kubectl describe appdbi example
 ```
 
-5. Inspect the status of the `AppDB` resource:
+4. Inspect the status of the `AppDB` resource:
 
 ```
 kubectl describe appdb sbtest

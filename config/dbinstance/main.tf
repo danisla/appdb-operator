@@ -72,16 +72,6 @@ module "instance_sa_email" {
   project  = "${var.project}"
 }
 
-// TODO: this is broken
-// resource "google_storage_bucket_acl" "snapshot-acl" {
-//   bucket = "${local.snapshot_bucket}"
-
-//   role_entity = [
-//     "OWNER:project-owners-${data.google_project.project.number}",
-//     "WRITER:${local.instance_sa_email}",
-//   ]
-// }
-
 output "name" {
   value = "${local.name}"
 }

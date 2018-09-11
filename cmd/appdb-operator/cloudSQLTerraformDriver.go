@@ -90,7 +90,7 @@ func makeTFVars(instance string, dbname string, users []string) (map[string]stri
 	return tfvars, nil
 }
 
-func makeLoadSnapshotJob(jobName, namespace, instanceName, snapshotURI, dbname, user, proxySecretName string) batchv1.Job {
+func makeLoadJob(jobName, namespace, instanceName, snapshotURI, dbname, user, saEmail string) batchv1.Job {
 	var job batchv1.Job
 
 	var parallelism int32 = 1
@@ -98,7 +98,7 @@ func makeLoadSnapshotJob(jobName, namespace, instanceName, snapshotURI, dbname, 
 	var deadlineSeconds int64 = 1200 // 20 minutes max to load data.
 	var numRetries int32 = 4
 
-	podSpec := makeLoadJobPodSpec(instanceName, snapshotURI, dbname, user, proxySecretName)
+	podSpec := makeLoadJobPodSpec(instanceName, snapshotURI, dbname, user, saEmail)
 
 	job = batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
@@ -125,19 +125,22 @@ func makeLoadSnapshotJob(jobName, namespace, instanceName, snapshotURI, dbname, 
 	return job
 }
 
-func makeLoadJobPodSpec(instanceName, snapshotURI, dbname, user, proxySecretName string) corev1.PodSpec {
+func makeLoadJobPodSpec(instanceName, snapshotURI, dbname, user, saEmail string) corev1.PodSpec {
 	var spec corev1.PodSpec
 
-	cmdStr := fmt.Sprintf("gcloud sql import %s %s --database=%s --user=%s", instanceName, snapshotURI, dbname, user)
-
-	loadJobScript := fmt.Sprintf(`
+	loadJobScript := `
 gcloud auth activate-service-account --key-file=$GOOGLE_CREDENTIALS
 gcloud config set project $GOOGLE_PROJECT
-%s
-`, cmdStr)
+
+gsutil acl ch -u ${INSTANCE_SA_EMAIL}:READER ${LOAD_URL}
+
+gcloud -q sql import sql ${INSTANCE_NAME} ${LOAD_URL} --database=${DATABASE}
+
+gsutil acl ch -d ${INSTANCE_SA_EMAIL} ${LOAD_URL}
+`
 
 	spec = corev1.PodSpec{
-		RestartPolicy: corev1.RestartPolicyNever,
+		RestartPolicy: corev1.RestartPolicyOnFailure,
 		Containers: []corev1.Container{
 			corev1.Container{
 				Name:  "sql-load",
@@ -160,9 +163,29 @@ gcloud config set project $GOOGLE_PROJECT
 					},
 					corev1.EnvVar{
 						Name:  "GOOGLE_CREDENTIALS",
-						Value: "/var/run/secrets/cloudsql/sa-key.json",
+						Value: "/var/run/secrets/cloudsql/GOOGLE_CREDENTIALS",
 					},
-				},
+					corev1.EnvVar{
+						Name:  "INSTANCE_NAME",
+						Value: instanceName,
+					},
+					corev1.EnvVar{
+						Name:  "DATABASE",
+						Value: dbname,
+					},
+					corev1.EnvVar{
+						Name:  "DATABASE_USER",
+						Value: user,
+					},
+					corev1.EnvVar{
+						Name:  "LOAD_URL",
+						Value: snapshotURI,
+					},
+					corev1.EnvVar{
+						Name:  "INSTANCE_SA_EMAIL",
+						Value: saEmail,
+					},
+				}, // []EnvVar
 			}, //Container
 		}, // Containers
 		Volumes: []corev1.Volume{
@@ -170,7 +193,7 @@ gcloud config set project $GOOGLE_PROJECT
 				Name: "sa-key",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: proxySecretName,
+						SecretName: tfDriverConfig.GoogleProviderConfigSecret,
 					},
 				},
 			},

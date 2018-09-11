@@ -23,17 +23,18 @@ type AppDBInstanceOperatorStatus struct {
 
 // AppDBInstanceCloudSQLStatus is the status structure for the CloudSQL driver
 type AppDBInstanceCloudSQLStatus struct {
-	InstanceName   string `json:"instanceName,omitempty"`
-	ConnectionName string `json:"connectionName,omitempty"`
-	Port           int32  `json:"port,omitempty"`
-	ProxyService   string `json:"proxyService,omitempty"`
-	ProxySecret    string `json:"proxySecret,omitempty"`
-	TFApplyName    string `json:"tfapplyName,omitempty"`
-	TFApplyPodName string `json:"tfapplyPodName,omitempty"`
-	TFApplySig     string `json:"tfapplySig,omitempty"`
-	TFPlanName     string `json:"tfplanName,omitempty"`
-	TFPlanPodName  string `json:"tfplanPodName,omitempty"`
-	TFPlanSig      string `json:"tfplanSig,omitempty"`
+	InstanceName        string `json:"instanceName,omitempty"`
+	ServiceAccountEmail string `json:"serviceAccountEmail,omitempty"`
+	ConnectionName      string `json:"connectionName,omitempty"`
+	Port                int32  `json:"port,omitempty"`
+	ProxyService        string `json:"proxyService,omitempty"`
+	ProxySecret         string `json:"proxySecret,omitempty"`
+	TFApplyName         string `json:"tfapplyName,omitempty"`
+	TFApplyPodName      string `json:"tfapplyPodName,omitempty"`
+	TFApplySig          string `json:"tfapplySig,omitempty"`
+	TFPlanName          string `json:"tfplanName,omitempty"`
+	TFPlanPodName       string `json:"tfplanPodName,omitempty"`
+	TFPlanSig           string `json:"tfplanSig,omitempty"`
 }
 
 // AppDBInstanceSpec is the top level structure of the spec body
@@ -54,7 +55,7 @@ type AppDBCloudSQLTerraformDriver struct {
 
 // CloudSQLProxySpec is the spec for a cloudsql proxy
 type CloudSQLProxySpec struct {
-	Image           string            `json:"image",omitempty`
+	Image           string            `json:"image,omitempty"`
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 	Replicas        int32             `json:"replicas,omitempty"`
 }

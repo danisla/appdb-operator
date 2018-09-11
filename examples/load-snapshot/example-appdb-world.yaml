@@ -1,0 +1,10 @@
+apiVersion: ctl.isla.solutions/v1
+kind: AppDB
+metadata:
+  name: world
+spec:
+  appDBInstance: example
+  dbName: world
+  users:
+  - world
+  loadURL: snapshots/world.sql.gz

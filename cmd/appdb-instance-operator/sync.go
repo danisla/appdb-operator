@@ -146,6 +146,13 @@ func sync(parentType ParentType, parent *appdbv1.AppDBInstance, children *AppDBI
 						status.CloudSQL.Port = int32(port)
 					}
 
+					// Get the serviceAccountEmail output variable
+					if saEmail, ok := tfapply.Status.TFOutput["instance_sa_email"]; ok == false {
+						myLog(parent, "ERROR", fmt.Sprintf("Output variable 'instance_sa_email' not found in status of TerraformApply: %s", tfapply.GetName()))
+					} else {
+						status.CloudSQL.ServiceAccountEmail = saEmail.Value
+					}
+
 					// Create the Cloud SQL Proxy
 					secret, deploy, svc, err := makeCloudSQLProxy(parent, tfapply)
 					if err != nil {

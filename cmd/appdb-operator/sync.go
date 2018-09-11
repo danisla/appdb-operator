@@ -102,21 +102,29 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 						}
 
 						// Optionally load snapshot from GCS.
-						if parent.Spec.LoadSnapshot != "" {
-							jobName := fmt.Sprintf("appdb-%s-load", parent.GetName())
-							job := makeLoadSnapshotJob(jobName, parent.GetNamespace(), appdbi.Status.CloudSQL.InstanceName, parent.Spec.LoadSnapshot, parent.Spec.DBName, parent.Spec.Users[0], appdbi.Status.CloudSQL.ProxySecret)
-							if currJob, ok := children.Jobs[job.GetName()]; ok == false {
+						if parent.Spec.LoadURL != "" {
+							jobName := fmt.Sprintf("appdb-%s-%s-load", appdbi.GetName(), parent.GetName())
+							loadURL := parent.Spec.LoadURL
+							if len(loadURL) >= 5 && loadURL[0:5] != "gs://" {
+								// Relative url to bucket.
+								loadURL = fmt.Sprintf("gs://%s/%s", tfDriverConfig.BackendBucket, parent.Spec.LoadURL)
+							}
+							job := makeLoadJob(jobName, parent.GetNamespace(), appdbi.Status.CloudSQL.InstanceName, loadURL, parent.Spec.DBName, parent.Spec.Users[0], appdbi.Status.CloudSQL.ServiceAccountEmail)
+							if currJob, ok := children.Jobs[job.GetName()]; ok == true {
 								// Wait for load job to complete.
 								if currJob.Status.Succeeded == 1 {
 									// load complete.
 									status.Provisioning = appdbv1.ProvisioningStatusComplete
+								} else if currJob.Status.Failed == *currJob.Spec.BackoffLimit {
+									// Requeue job
+									desiredJobs[job.GetName()] = true
 								}
 							} else {
 								// Create job
 								desiredJobs[job.GetName()] = true
 								desiredChildren = append(desiredChildren, job)
 
-								myLog(parent, "INFO", fmt.Sprintf("Created SQL load job from snapshot %s: %s", parent.Spec.LoadSnapshot, job.GetName()))
+								myLog(parent, "INFO", fmt.Sprintf("Created SQL load job from snapshot %s: %s", loadURL, job.GetName()))
 							}
 						} else {
 							// No load job, so done.

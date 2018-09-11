@@ -33,5 +33,5 @@ type AppDBSpec struct {
 	Driver        AppDBDriver `json:"driver,omitempty"`
 	DBName        string      `json:"dbName,omitempty"`
 	Users         []string    `json:"users,omitempty"`
-	LoadSnapshot  string      `json:"LoadSnapshot,omitempty"`
+	LoadURL       string      `json:"loadURL,omitempty"`
 }

@@ -1,0 +1,6 @@
+apiVersion: ctl.isla.solutions/v1
+kind: TerraformDestroy
+metadata:
+  name: appdb-example-world
+specFrom:
+  tfapply: appdb-example-world

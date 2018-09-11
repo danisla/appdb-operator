@@ -99,7 +99,7 @@ spec:
       serviceAccountName: appdb-operator
       containers:
       - name: appdb-instance-operator
-        image: gcr.io/cloud-solutions-group/appdb-operator:0.1.4
+        image: gcr.io/cloud-solutions-group/appdb-operator:0.2.0
         imagePullPolicy: Always
         command: ["/usr/bin/appdb-instance-operator"]
         env:
@@ -112,7 +112,7 @@ spec:
         # - name: HTTP_DEBUG
         #   value: "true"
       - name: appdb-operator
-        image: gcr.io/cloud-solutions-group/appdb-operator:0.1.4
+        image: gcr.io/cloud-solutions-group/appdb-operator:0.2.0
         imagePullPolicy: Always
         command: ["/usr/bin/appdb-operator"]
         env:

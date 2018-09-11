@@ -60,7 +60,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 
 	if appdbi.Spec.Driver.CloudSQLTerraform != nil {
 
-		tfApplyName := fmt.Sprintf("appdb-%s-%s", appdbi.GetName(), parent.Name)
+		tfApplyName := fmt.Sprintf("appdb-%s-%s", appdbi.GetName(), parent.GetName())
 
 		if tfapply, ok := children.TerraformApplys[tfApplyName]; ok == true {
 			if status.CloudSQLDB == nil {
@@ -87,7 +87,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 							} else {
 								status.CredentialsSecrets = make(map[string]string, 0)
 								for i := 0; i < len(parent.Spec.Users); i++ {
-									secretName := fmt.Sprintf("appdb-%s-user-%d", parent.GetName(), i)
+									secretName := fmt.Sprintf("appdb-%s-%s-user-%d", appdbi.GetName(), parent.GetName(), i)
 
 									secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users[i], passwords[i], appdbi.Status.DBHost, appdbi.Status.DBPort)
 

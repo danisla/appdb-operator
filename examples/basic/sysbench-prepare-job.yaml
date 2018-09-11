@@ -27,20 +27,20 @@ spec:
         - name: DB_HOST
           valueFrom:
             secretKeyRef:
-              name: appdb-sbtest-user-0
+              name: appdb-example-sbtest-user-0
               key: dbhost
         - name: DB_PORT
           valueFrom:
             secretKeyRef:
-              name: appdb-sbtest-user-0
+              name: appdb-example-sbtest-user-0
               key: dbport
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: appdb-sbtest-user-0
+              name: appdb-example-sbtest-user-0
               key: user
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: appdb-sbtest-user-0
+              name: appdb-example-sbtest-user-0
               key: password

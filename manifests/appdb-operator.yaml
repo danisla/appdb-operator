@@ -66,14 +66,10 @@ spec:
     apiVersion: ctl.isla.solutions/v1
     resource: appdbs
   childResources:
+  - apiVersion: extensions/v1beta1
+    resource: replicasets
   - apiVersion: v1
-    resource: secrets
-  - apiVersion: batch/v1
-    resource: jobs
-  - apiVersion: ctl.isla.solutions/v1
-    resource: terraformapplys
-  - apiVersion: ctl.isla.solutions/v1
-    resource: terraformplans
+    resource: persistentvolumeclaims
   hooks:
     sync:
       webhook:
@@ -99,7 +95,7 @@ spec:
       serviceAccountName: appdb-operator
       containers:
       - name: appdb-instance-operator
-        image: gcr.io/cloud-solutions-group/appdb-operator:0.2.0
+        image: gcr.io/cloud-solutions-group/appdb-operator:0.2.1
         imagePullPolicy: Always
         command: ["/usr/bin/appdb-instance-operator"]
         env:
@@ -112,7 +108,7 @@ spec:
         # - name: HTTP_DEBUG
         #   value: "true"
       - name: appdb-operator
-        image: gcr.io/cloud-solutions-group/appdb-operator:0.2.0
+        image: gcr.io/cloud-solutions-group/appdb-operator:0.2.1
         imagePullPolicy: Always
         command: ["/usr/bin/appdb-operator"]
         env:

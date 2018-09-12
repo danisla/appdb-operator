@@ -32,6 +32,7 @@ locals {
   name              = "${var.name}-${random_id.name.hex}"
   port              = "${substr(var.database_version, 0, 5) == "MYSQL" ? "3306" : "5432"}"
   instance_sa_email = "${module.instance_sa_email.sa_email}"
+  proxy_sa_id       = "cloudsql-proxy-${random_id.name.hex}"
   proxy_sa_key      = "${google_service_account_key.cloudsql-proxy.private_key}"
   proxy_sa_email    = "${google_service_account.cloudsql-proxy.email}"
   snapshot_bucket   = "${var.snapshot_bucket == "" ? format("%s-appdb-operator", data.google_project.project.project_id) : var.snapshot_bucket}"
@@ -51,7 +52,7 @@ module "db-instance" {
 
 resource "google_service_account" "cloudsql-proxy" {
   project      = "${var.project}"
-  account_id   = "${local.name}-proxy"
+  account_id   = "${local.proxy_sa_id}"
   display_name = "${local.name} Cloud SQL Proxy"
 }
 

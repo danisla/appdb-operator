@@ -5,6 +5,11 @@ all: image
 image:
 	gcloud builds submit --config cloudbuild.yaml --project cloud-solutions-group --substitutions=TAG_NAME=$(TAG)
 
+docker-clean:
+	@docker ps --filter status=exited -q | xargs -I {} docker rm {} 2>/dev/null
+	@docker ps --filter status=created -q | xargs -I {} docker rm {} 2>/dev/null
+	@docker images --filter dangling=true -q | xargs -I {} docker rmi {} 2>/dev/null
+
 install-metacontroller:
 	-kubectl create clusterrolebinding $(USER)-cluster-admin-binding --clusterrole=cluster-admin --user=$(shell gcloud config get-value account)
 

@@ -43,10 +43,12 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 	if err != nil {
 		// Wait for AppDBInstance provisioning status to COMPLETE
 		myLog(parent, "INFO", fmt.Sprintf("Waiting for AppDBInstance: %s", parent.Spec.AppDBInstance))
+		status.Provisioning = appdbv1.ProvisioningStatusPending
 		return &status, &desiredChildren, nil
 	} else if appdbi.Status.Provisioning != appdbv1.ProvisioningStatusComplete {
 		// Wait for provisioning to complete.
 		myLog(parent, "INFO", fmt.Sprintf("Waiting for AppDBInstance provisioning to complete: %s", parent.Spec.AppDBInstance))
+		status.Provisioning = appdbv1.ProvisioningStatusPending
 		return &status, &desiredChildren, nil
 	} else {
 		status.AppDBInstanceSig = calcParentSig(appdbi.Spec, "")

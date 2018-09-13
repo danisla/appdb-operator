@@ -29,9 +29,8 @@ type AppDB struct {
 
 // AppDBSpec is the top level structure of the spec body
 type AppDBSpec struct {
-	AppDBInstance string      `json:"appDBInstance,omitempty"`
-	Driver        AppDBDriver `json:"driver,omitempty"`
-	DBName        string      `json:"dbName,omitempty"`
-	Users         []string    `json:"users,omitempty"`
-	LoadURL       string      `json:"loadURL,omitempty"`
+	AppDBInstance string   `json:"appDBInstance,omitempty"`
+	DBName        string   `json:"dbName,omitempty"`
+	Users         []string `json:"users,omitempty"`
+	LoadURL       string   `json:"loadURL,omitempty"`
 }

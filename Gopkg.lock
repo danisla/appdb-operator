@@ -10,12 +10,12 @@
   version = "v0.26.0"
 
 [[projects]]
-  digest = "1:10dd161525bf2dc22337bca5d8332ceaa9888871b20a582d4ba3b445b5ca20fa"
+  digest = "1:103a54d02f31eb92c8c271c8f922b466d20a79095231062f308527ab467fac33"
   name = "github.com/danisla/terraform-operator"
   packages = ["pkg/types"]
   pruneopts = "UT"
-  revision = "fe9bef1be77cfb31adf9a2def874bd974c1f7af9"
-  version = "0.3.4"
+  revision = "3348243c9fd850377d6febb2f1bd256cf52b47f8"
+  version = "0.3.10"
 
 [[projects]]
   digest = "1:2cd7915ab26ede7d95b8749e6b1f933f1c6d5398030684e6505940a10f31cfda"
@@ -234,7 +234,7 @@
   ]
   pruneopts = "UT"
   revision = "73d903622b7391f3312dcbac6483fed484e185f8"
-  version = "kubernetes-1.10.1"
+  version = "kubernetes-1.10.0"
 
 [[projects]]
   digest = "1:5306fa4e911383bc8540148123e6a81aea1786dbf592ac051fd572fdd8a173b1"
@@ -278,10 +278,10 @@
   ]
   pruneopts = "UT"
   revision = "302974c03f7e50f16561ba237db776ab93594ef6"
-  version = "kubernetes-1.10.1"
+  version = "kubernetes-1.10.0"
 
 [[projects]]
-  digest = "1:ee09b03e21c94c86f3428376b8e5d2154f384f1260399ed11115c9cd049634c1"
+  digest = "1:668e3c4436108728b89f3c349a7932ffc2c3436c23e202f99924479889e01fa5"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -330,8 +330,8 @@
     "util/integer",
   ]
   pruneopts = "UT"
-  revision = "989be4278f353e42f26c416c53757d16fcff77db"
-  version = "kubernetes-1.10.1"
+  revision = "23781f4d6632d88e869066eaebb743857aa1ef9b"
+  version = "kubernetes-1.10.0"
 
 [solve-meta]
   analyzer-name = "dep"

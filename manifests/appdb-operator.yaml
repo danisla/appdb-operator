@@ -66,10 +66,14 @@ spec:
     apiVersion: ctl.isla.solutions/v1
     resource: appdbs
   childResources:
-  - apiVersion: extensions/v1beta1
-    resource: replicasets
   - apiVersion: v1
-    resource: persistentvolumeclaims
+    resource: secrets
+  - apiVersion: batch/v1
+    resource: jobs
+  - apiVersion: ctl.isla.solutions/v1
+    resource: terraformapplys
+  - apiVersion: ctl.isla.solutions/v1
+    resource: terraformplans
   hooks:
     sync:
       webhook:

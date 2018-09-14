@@ -101,11 +101,13 @@ kubectl apply -f example-appdbinstance.yaml && \
 2. Wait for the database instance and database provisioning to complete:
 
 ```
-(until [[ $(kubectl get appdbi example -o jsonpath='{.status.provisioning}') == "COMPLETE"  ]]; do echo "Waiting for AppDBInstance..."; sleep 2; done && echo "AppDBInstance is ready") && \
-  (until [[ $(kubectl get appdb sbtest -o jsonpath='{.status.provisioning}') == "COMPLETE"  ]]; do echo "Waiting for AppDB..."; sleep 2; done && echo "AppDB is ready")
+until kubectl wait pod/appdbi-example-tfapply-0 --for=condition=Initialized && \
+  kubectl logs -f appdbi-example-tfapply-0 && \
+  kubectl wait pod/appdb-example-sbtest-tfapply-0 --for=condition=Initialized && \
+  kubectl logs -f appdb-example-sbtest-tfapply-0; do sleep 2; done
 ```
 
-> Note, this step will take 4-7 minutes to complete. To monitor the terraform output, tail the logs from the `appdbi-example-tfapply-0` and `appdb-example-sbtest-tfapply-0` pods.
+> Note, this step will take 4-7 minutes to complete.
 
 3. Inspect the status of the `AppDBInstance` resource:
 
@@ -138,13 +140,7 @@ kubectl apply -f sysbench-prepare-job.yaml
 3. Wait for `sysbench-prepare` job to complete:
 
 ```
-( until [[ $(kubectl get job sysbench-prepare -o jsonpath='{.status.succeeded}') -eq 1 ]]; do echo "Waiting for sysbench-prepare job..."; sleep 2; done && echo "sysbench-prepare job complete")
-```
-
-4. Inspect the logs from the job:
-
-```
-kubectl logs job/sysbench-prepare
+kubectl logs -f job/sysbench-prepare
 ```
 
 ## Cleanup
@@ -158,34 +154,26 @@ kubectl delete job sysbench-prepare
 2. Delete the App Database and user using the `example-appdb-tfdestroy.yaml` file:
 
 ```
-kubectl apply -f example-appdb-tfdestroy.yaml && \
-  ( until [[ $(kubectl get tfdestroy appdb-example-sbtest -o jsonpath='{.status.podStatus}') == "COMPLETED" ]]; do echo "Waiting for TerraformDestroy to complete..."; sleep 2; done && echo "TerraformDestroy complete" ) && \
-  kubectl delete tfdestroy appdb-example-sbtest
+until kubectl apply -f example-appdb-tfdestroy.yaml && \
+  kubectl wait pod/appdb-example-sbtest-tfdestroy-0 --for=condition=Initialized && \
+  kubectl logs -f appdb-example-sbtest-tfdestroy-0 && \
+  kubectl delete tfdestroy appdb-example-sbtest && \
+  kubectl delete appdb sbtest; do sleep 2; done
 ```
 
-3. Delete the `AppDB` resource:
+3. Delete the App Datbase Instance using the `example-appdbinstance-tfdestroy.yaml` file:
 
 ```
-kubectl delete appdb sbtest
-```
-
-4. Delete the App Datbase Instance using the `example-appdbinstance-tfdestroy.yaml` file:
-
-```
-kubectl apply -f example-appdbinstance-tfdestroy.yaml && \
-  ( until [[ $(kubectl get tfdestroy appdbi-example -o jsonpath='{.status.podStatus}') == "COMPLETED" ]]; do echo "Waiting for TerraformDestroy to complete..."; sleep 2; done && echo "TerraformDestroy complete" ) && \
-  kubectl delete tfdestroy appdbi-example
+until kubectl apply -f example-appdbinstance-tfdestroy.yaml && \
+  kubectl wait pod/appdbi-example-tfdestroy-0 --for=condition=Initialized && \
+  kubectl logs -f appdbi-example-tfdestroy-0 && \
+  kubectl delete tfdestroy appdbi-example && \
+  kubectl delete appdbi example; do sleep 2; done
 ```
 
 > Note that this step can take 2-5 minutes to complete as the Cloud SQL database is being destroyed. 
 
-5. Delete the `AppDBInstance` resource:
-
-```
-kubectl delete appdbi example
-```
-
-6. Delete the GKE cluster:
+4. Delete the GKE cluster:
 
 ```
 ZONE=us-central1-b

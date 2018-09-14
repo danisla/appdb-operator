@@ -47,7 +47,9 @@ var conditionDependencies = map[appdbv1.AppDBConditionType][]appdbv1.AppDBCondit
 		appdbv1.ConditionTypeAppDBInstanceReady,
 	},
 	appdbv1.ConditionTypeCredentialsSecretCreated: []appdbv1.AppDBConditionType{
-		appdbv1.ConditionTypeAppDBInstanceReady,
 		appdbv1.ConditionTypeDBCreateComplete,
+	},
+	appdbv1.ConditionTypeSnapshotLoadComplete: []appdbv1.AppDBConditionType{
+		appdbv1.ConditionTypeCredentialsSecretCreated,
 	},
 }

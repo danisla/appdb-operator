@@ -1,6 +1,9 @@
 package types
 
 import (
+	"fmt"
+	"log"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -13,9 +16,14 @@ type AppDBInstance struct {
 	Status            AppDBInstanceOperatorStatus `json:"status"`
 }
 
+// Log is a conventional log method to print the parent name and kind before the log message.
+func (parent *AppDBInstance) Log(level, msgfmt string, fmtargs ...interface{}) {
+	log.Printf("[%s][%s][%s] %s", level, parent.Kind, parent.Name, fmt.Sprintf(msgfmt, fmtargs...))
+}
+
 // AppDBInstanceOperatorStatus is the status structure for the custom resource
 type AppDBInstanceOperatorStatus struct {
-	Provisioning string                       `json:"provisioning"`
+	Provisioning ProvisioningStatus           `json:"provisioning"`
 	DBHost       string                       `json:"dbHost"`
 	DBPort       int32                        `json:"dbPort"`
 	CloudSQL     *AppDBInstanceCloudSQLStatus `json:"cloudSQL"`

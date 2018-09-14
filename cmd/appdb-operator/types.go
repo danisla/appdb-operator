@@ -32,3 +32,22 @@ type AppDBChildren struct {
 	Secrets         map[string]corev1.Secret  `json:"Secret.v1"`
 	Jobs            map[string]batchv1.Job    `json:"Job.batch/v1"`
 }
+
+// Order of condition status
+var conditionStatusOrder = []appdbv1.AppDBConditionType{
+	appdbv1.ConditionTypeAppDBInstanceReady,
+	appdbv1.ConditionTypeDBCreateComplete,
+	appdbv1.ConditionTypeCredentialsSecretCreated,
+	appdbv1.ConditionTypeSnapshotLoadComplete,
+	appdbv1.ConditionTypeAppDBReady,
+}
+
+var conditionDependencies = map[appdbv1.AppDBConditionType][]appdbv1.AppDBConditionType{
+	appdbv1.ConditionTypeDBCreateComplete: []appdbv1.AppDBConditionType{
+		appdbv1.ConditionTypeAppDBInstanceReady,
+	},
+	appdbv1.ConditionTypeCredentialsSecretCreated: []appdbv1.AppDBConditionType{
+		appdbv1.ConditionTypeAppDBInstanceReady,
+		appdbv1.ConditionTypeDBCreateComplete,
+	},
+}

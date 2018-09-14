@@ -6,6 +6,8 @@ import (
 	"time"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
+	tfv1 "github.com/danisla/terraform-operator/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/jinzhu/copier"
 )
@@ -15,212 +17,460 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 	var status appdbv1.AppDBOperatorStatus
 	copier.Copy(&status, &parent.Status)
 
-	desiredTFApplys := make(map[string]bool, 0)
-	desiredSecrets := make(map[string]bool, 0)
-	desiredJobs := make(map[string]bool, 0)
 	desiredChildren := make([]interface{}, 0)
 
-	if parent.Spec.AppDBInstance == "" {
-		// Must have AppDBInstance
-		myLog(parent, "ERROR", "Missing appDBInstance")
+	// Current time used for updating conditions
+	tNow := metav1.NewTime(time.Now())
+
+	// Verify required top level fields.
+	if err = verifySpec(parent); err != nil {
+		parent.Log("ERROR", "Invalid spec: %v", err)
+		status.Conditions = append(status.Conditions, appdbv1.AppDBCondition{
+			Type:               appdbv1.ConditionTypeAppDBReady,
+			Status:             appdbv1.ConditionFalse,
+			LastProbeTime:      tNow,
+			LastTransitionTime: tNow,
+			Reason:             "Invalid spec",
+			Message:            fmt.Sprintf("%v", err),
+		})
 		return &status, &desiredChildren, nil
 	}
 
-	if parent.Spec.DBName == "" {
-		// Must have DBName
-		myLog(parent, "ERROR", "Missing dbName")
-		return &status, &desiredChildren, nil
+	// Map of condition types to conditions, converted to list of conditions after switch statement.
+	conditions := make(map[appdbv1.AppDBConditionType]*appdbv1.AppDBCondition, 0)
+	conditionOrder := makeConditionOrder(parent)
+
+	// Extract existing conditions from status and copy to conditions map for easier lookup.
+	for _, c := range conditionOrder {
+		// Search for condition type in conditions.
+		found := false
+		for _, condition := range status.Conditions {
+			if condition.Type == c {
+				found = true
+				condition.LastProbeTime = tNow
+				condition.Reason = ""
+				condition.Message = ""
+				conditions[c] = &condition
+				break
+			}
+		}
+		if found == false {
+			// Initialize condition with unknown state
+			conditions[c] = &appdbv1.AppDBCondition{
+				Type:               c,
+				Status:             appdbv1.ConditionUnknown,
+				LastProbeTime:      tNow,
+				LastTransitionTime: tNow,
+			}
+		}
 	}
 
-	if len(parent.Spec.Users) == 0 {
-		// Must have at least 1 user
-		myLog(parent, "ERROR", "Users list is empty")
-		return &status, &desiredChildren, nil
-	}
-
+	// Resources used in multiple conditions.
 	var appdbi appdbv1.AppDBInstance
-	appdbi, err = getAppDBInstance(parent.GetNamespace(), parent.Spec.AppDBInstance)
-	if err != nil {
-		// Wait for AppDBInstance provisioning status to COMPLETE
-		myLog(parent, "INFO", fmt.Sprintf("Waiting for AppDBInstance: %s", parent.Spec.AppDBInstance))
-		status.Provisioning = appdbv1.ProvisioningStatusPending
-		return &status, &desiredChildren, nil
-	} else if appdbi.Status.Provisioning != appdbv1.ProvisioningStatusComplete {
-		// Wait for provisioning to complete.
-		myLog(parent, "INFO", fmt.Sprintf("Waiting for AppDBInstance provisioning to complete: %s", parent.Spec.AppDBInstance))
-		status.Provisioning = appdbv1.ProvisioningStatusPending
-		return &status, &desiredChildren, nil
-	} else {
-		status.AppDBInstanceSig = calcParentSig(appdbi.Spec, "")
-	}
+	var tfapply tfv1.Terraform
 
-	if status.AppDBInstanceSig != "" && status.AppDBInstanceSig != calcParentSig(appdbi.Spec, "") {
-		// AppDBInstance changed, clear out children and start over.
-		myLog(parent, "WARN", fmt.Sprintf("AppDBInstance signature changed, deleting all child resources"))
-		return &status, &desiredChildren, nil
-	}
+	// Reconcile each condition.
+	for _, conditionType := range conditionOrder {
+		condition := conditions[conditionType]
+		newStatus := condition.Status
 
-	if appdbi.Spec.Driver.CloudSQLTerraform != nil {
+		// Skip processing conditions with unmet dependencies.
+		if err = checkConditions(conditionType, conditions); err != nil {
+			newStatus = appdbv1.ConditionFalse
+			condition.Reason = err.Error()
+			if condition.Status != newStatus {
+				condition.LastTransitionTime = tNow
+				condition.Status = newStatus
+			}
+			continue
+		}
 
-		tfApplyName := fmt.Sprintf("appdb-%s-%s", appdbi.GetName(), parent.GetName())
-
-		if tfapply, ok := children.TerraformApplys[tfApplyName]; ok == true {
-			if status.CloudSQLDB == nil {
-				myLog(parent, "WARN", "Found TerraformPlan in children, but status.CloudSQLDB was nil, re-sync collision.")
-				// Delete TerraformApply and try again
-				desiredTFApplys[tfApplyName] = true
-			} else {
-
-				mySig := calcParentSig(parent.Spec, "")
-				tfapplySig := tfapply.Annotations["appdb-parent-sig"]
-
-				if mySig == tfapplySig {
-
-					status.CloudSQLDB.TFApplyPodName = tfapply.Status.PodName
-
-					if tfapply.Status.PodStatus == "COMPLETED" {
-
-						// Generate secret for DB credentials.
-						if passwordsVar, ok := tfapply.Status.TFOutput["user_passwords"]; ok == true {
-
-							passwords := strings.Split(passwordsVar.Value, ",")
-							if len(parent.Spec.Users) != len(passwords) {
-								myLog(parent, "ERROR", "passwords output from TerraformApply is different length than input users.")
-							} else {
-								status.CredentialsSecrets = make(map[string]string, 0)
-								for i := 0; i < len(parent.Spec.Users); i++ {
-									secretName := fmt.Sprintf("appdb-%s-%s-user-%d", appdbi.GetName(), parent.GetName(), i)
-
-									secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users[i], passwords[i], appdbi.Status.DBHost, appdbi.Status.DBPort)
-
-									status.CredentialsSecrets[parent.Spec.Users[i]] = secretName
-
-									desiredSecrets[secretName] = true
-									desiredChildren = append(desiredChildren, secret)
-								}
-							}
-						} else {
-							myLog(parent, "ERROR", "No user_passwords found in output varibles of TerraformApply status")
-						}
-
-						// Optionally load snapshot from GCS.
-						if parent.Spec.LoadURL != "" {
-							jobName := fmt.Sprintf("appdb-%s-%s-load", appdbi.GetName(), parent.GetName())
-							loadURL := parent.Spec.LoadURL
-							if len(loadURL) >= 5 && loadURL[0:5] != "gs://" {
-								// Relative url to bucket.
-								loadURL = fmt.Sprintf("gs://%s/%s", tfDriverConfig.BackendBucket, parent.Spec.LoadURL)
-							}
-							job := makeLoadJob(jobName, parent.GetNamespace(), appdbi.Status.CloudSQL.InstanceName, loadURL, parent.Spec.DBName, parent.Spec.Users[0], appdbi.Status.CloudSQL.ServiceAccountEmail)
-							if currJob, ok := children.Jobs[job.GetName()]; ok == true {
-								// Wait for load job to complete.
-								if currJob.Status.Succeeded == 1 {
-									// load complete.
-									status.Provisioning = appdbv1.ProvisioningStatusComplete
-								} else if currJob.Status.Failed == *currJob.Spec.BackoffLimit {
-									// Requeue job
-									desiredJobs[job.GetName()] = true
-								}
-							} else {
-								// Create job
-								desiredJobs[job.GetName()] = true
-								desiredChildren = append(desiredChildren, job)
-
-								myLog(parent, "INFO", fmt.Sprintf("Created SQL load job from snapshot %s: %s", loadURL, job.GetName()))
-							}
-						} else {
-							// No load job, so done.
-							status.Provisioning = appdbv1.ProvisioningStatusComplete
-						}
-
-					} else if tfapply.Status.PodStatus == "FAILED" {
-						status.Provisioning = appdbv1.ProvisioningStatusFailed
-
-						// Try again in 60 seconds.
-						tfapplyFishedAtTime, err := time.Parse(time.RFC3339, tfapply.Status.FinishedAt)
-						if err != nil {
-							myLog(parent, "WARN", fmt.Sprintf("Failed to parse tfplan finished at time: %v", err))
-						} else {
-							if time.Since(tfapplyFishedAtTime).Seconds() > 60 {
-								myLog(parent, "INFO", "Retrying TerraformApply")
-								// Setting desiredTFApplys to true will cause it to be omitted during the claim phase, therefore deleting it.
-								desiredTFApplys[tfApplyName] = true
-							}
-						}
-					} else {
-						status.Provisioning = appdbv1.ProvisioningStatusPending
-					}
+		switch conditionType {
+		case appdbv1.ConditionTypeAppDBInstanceReady:
+			newStatus = appdbv1.ConditionFalse
+			appdbi, err = getAppDBInstance(parent.GetNamespace(), parent.Spec.AppDBInstance)
+			if err == nil {
+				if status.AppDBInstanceSig != "" && status.AppDBInstanceSig != calcParentSig(appdbi.Spec, "") {
+					// AppDBInstance spec changed.
+					condition.Reason = fmt.Sprintf("AppDBInstance/%s change detected", appdbi.GetName())
 				} else {
-					// Patch tfapply with updated spec.
-					myLog(parent, "INFO", fmt.Sprintf("Change detected, patching TerraformApply: %s", tfApplyName))
+					if appdbi.Status.Provisioning == appdbv1.ProvisioningStatusComplete {
+						newStatus = appdbv1.ConditionTrue
+						status.AppDBInstanceSig = calcParentSig(appdbi.Spec, "")
+					}
+					condition.Reason = fmt.Sprintf("AppDBInstance/%s: %s", appdbi.GetName(), appdbi.Status.Provisioning)
+				}
+			} else {
+				condition.Reason = fmt.Sprintf("AppDBInstance/%s: Not found", parent.Spec.AppDBInstance)
+			}
 
-					tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
-					if err != nil {
-						myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
-					} else {
-						if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
-							// found existing tfapply, apply changes to it.
+		case appdbv1.ConditionTypeDBCreateComplete:
+			if appdbi.Spec.Driver.CloudSQLTerraform != nil {
+				// Terraform driver
+
+				var ok bool
+				newStatus = appdbv1.ConditionFalse
+				tfApplyName := makeTFApplyName(parent, appdbi)
+				tfapply, ok = children.TerraformApplys[tfApplyName]
+				if ok == false {
+					parent.Log("INFO", "Creating new TerraformApply/%s", tfApplyName)
+					tfapply, err = makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
+				}
+				if err != nil {
+					condition.Reason = fmt.Sprintf("Failed to make tfapply: %v", err)
+				} else {
+					condition.Reason = fmt.Sprintf("TerraformApply/%s: %s", tfapply.GetName(), tfapply.Status.PodStatus)
+
+					status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
+						TFApplyName:    tfapply.GetName(),
+						TFApplyPodName: tfapply.Status.PodName,
+						TFApplySig:     tfapply.Annotations["appdb-parent-sig"],
+					}
+
+					if status.CloudSQLDB.TFApplySig != calcParentSig(parent.Spec, "") {
+						// Patch tfapply with updated spec.
+						parent.Log("INFO", "Change detected, patching TerraformApply/%s", tfapply.GetName())
+
+						tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
+						if err != nil {
+							condition.Reason = fmt.Sprintf("Failed to make tfapply: %v", err)
+						} else {
 							err = kubectlApply(parent.GetNamespace(), tfApplyName, tfapply)
 							if err != nil {
-								myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
+								condition.Reason = fmt.Sprintf("Failed to apply updated tfapply: %v", err)
+							}
+						}
+						claimChildIfNotPresnet(tfApplyName, "TerraformApply", tfapply, children, &desiredChildren)
+					} else {
+						// TODO: expose the PodStatus enums to the terraform-operator package
+						if tfapply.Status.PodStatus == "COMPLETED" {
+							newStatus = appdbv1.ConditionTrue
+							claimChildIfNotPresnet(tfApplyName, "TerraformApply", tfapply, children, &desiredChildren)
+						} else if tfapply.Status.PodStatus == "FAILED" {
+							condition.Reason = fmt.Sprintf("TerraformApply/%s pod failed", tfapply.GetName())
+
+							// Try again in 60 seconds.
+							tfapplyFishedAtTime, err := time.Parse(time.RFC3339, tfapply.Status.FinishedAt)
+							if err != nil {
+								condition.Reason = fmt.Sprintf("Failed to parse tfplan finished at time: %v", err)
 							} else {
-
-								status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
-									TFApplyName: tfapply.GetName(),
-									TFApplySig:  calcParentSig(parent.Spec, ""),
+								condition.Message = "Retry in 60 seconds"
+								if time.Since(tfapplyFishedAtTime).Seconds() > 60 {
+									parent.Log("Retrying TerraformApply,%s", tfapply.GetName())
+								} else {
+									claimChildIfNotPresnet(tfApplyName, "TerraformApply", tfapply, children, &desiredChildren)
 								}
-
-								desiredTFApplys[tfApplyName] = true
-								desiredChildren = append(desiredChildren, tfapply)
 							}
 						} else {
-							myLog(parent, "WARN", "No existing TerraformApply claimed to main changes to.")
+							claimChildIfNotPresnet(tfApplyName, "TerraformApply", tfapply, children, &desiredChildren)
 						}
 					}
 				}
+			} else {
+				condition.Reason = "Unsupported AppDBInstance driver."
 			}
-		} else {
-			// Create new TerraformApply to create DB and users.
-			tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
-			if err != nil {
-				myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL DB: %v", err))
-				return &status, &desiredChildren, nil
+		case appdbv1.ConditionTypeCredentialsSecretCreated:
+			// Generate secret for DB credentials.
+			if passwordsVar, ok := tfapply.Status.TFOutput["user_passwords"]; ok == true {
+				passwords := strings.Split(passwordsVar.Value, ",")
+				if len(parent.Spec.Users) != len(passwords) {
+					newStatus = appdbv1.ConditionFalse
+					condition.Reason = fmt.Sprintf("passwords output from TerraformApply is different length than input users.")
+				} else {
+					status.CredentialsSecrets = make(map[string]string, 0)
+					secretNames := []string{}
+					for i := 0; i < len(parent.Spec.Users); i++ {
+						secretName := fmt.Sprintf("appdb-%s-%s-user-%d", appdbi.GetName(), parent.GetName(), i)
+
+						secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users[i], passwords[i], appdbi.Status.DBHost, appdbi.Status.DBPort)
+
+						secretNames = append(secretNames, secretName)
+
+						status.CredentialsSecrets[parent.Spec.Users[i]] = secretName
+
+						claimChildIfNotPresnet(secretName, "Secret", secret, children, &desiredChildren)
+
+						newStatus = appdbv1.ConditionTrue
+					}
+					condition.Reason = fmt.Sprintf("Secret/%s: CREATED", strings.Join(secretNames, ","))
+				}
+			} else {
+				newStatus = appdbv1.ConditionFalse
+				condition.Reason = "No user_passwords found in output varibles of TerraformApply status"
 			}
-
-			desiredTFApplys[tfApplyName] = true
-			desiredChildren = append(desiredChildren, tfapply)
-
-			myLog(parent, "INFO", fmt.Sprintf("Creating TerraformApply: %s", tfApplyName))
-
-			status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
-				TFApplyName: tfapply.GetName(),
-				TFApplySig:  calcParentSig(parent.Spec, ""),
+		case appdbv1.ConditionTypeSnapshotLoadComplete:
+		case appdbv1.ConditionTypeAppDBReady:
+			newStatus = appdbv1.ConditionTrue
+			notReady := []string{}
+			for _, c := range conditionOrder {
+				if c != appdbv1.ConditionTypeAppDBReady && conditions[c].Status != appdbv1.ConditionTrue {
+					notReady = append(notReady, string(c))
+					newStatus = appdbv1.ConditionFalse
+				}
+			}
+			if len(notReady) > 0 {
+				condition.Reason = fmt.Sprintf("Waiting for conditions: %s", strings.Join(notReady, ","))
+				status.Provisioning = appdbv1.ProvisioningStatusPending
+			} else {
+				condition.Reason = "All conditions satisfied"
+				status.Provisioning = appdbv1.ProvisioningStatusComplete
 			}
 		}
 
-		// Claim new terraformapplys else claim existing.
-		for _, o := range children.TerraformApplys {
-			if desiredTFApplys[o.Name] == false {
-				desiredChildren = append(desiredChildren, o)
-			}
+		if condition.Status != newStatus {
+			condition.LastTransitionTime = tNow
+			condition.Status = newStatus
 		}
-
-		// Claim new secrets else claim existing.
-		for _, o := range children.Secrets {
-			if desiredSecrets[o.Name] == false {
-				desiredChildren = append(desiredChildren, o)
-			}
-		}
-
-		// Claim new jobs else claim existing.
-		for _, o := range children.Jobs {
-			if desiredJobs[o.Name] == false {
-				desiredChildren = append(desiredChildren, o)
-			}
-		}
-	} else {
-		myLog(parent, "WARN", "Unsupported AppDBInstance driver")
 	}
 
+	// Copy updated conditions back to status in order.
+	newConditions := make([]appdbv1.AppDBCondition, 0)
+	for _, c := range conditionOrder {
+		newConditions = append(newConditions, *conditions[c])
+	}
+	status.Conditions = newConditions
+
 	return &status, &desiredChildren, nil
+
+	// var err error
+	// var appdbi appdbv1.AppDBInstance
+	// appdbi, err = getAppDBInstance(parent.GetNamespace(), parent.Spec.AppDBInstance)
+	// if err != nil {
+	// 	// Wait for AppDBInstance provisioning status to COMPLETE
+	// 	myLog(parent, "INFO", fmt.Sprintf("Waiting for AppDBInstance: %s", parent.Spec.AppDBInstance))
+	// 	status.Provisioning = appdbv1.ProvisioningStatusPending
+	// 	return &status, &desiredChildren, nil
+	// } else if appdbi.Status.Provisioning != appdbv1.ProvisioningStatusComplete {
+	// 	// Wait for provisioning to complete.
+	// 	myLog(parent, "INFO", fmt.Sprintf("Waiting for AppDBInstance provisioning to complete: %s", parent.Spec.AppDBInstance))
+	// 	status.Provisioning = appdbv1.ProvisioningStatusPending
+	// 	return &status, &desiredChildren, nil
+	// } else {
+	// 	status.AppDBInstanceSig = calcParentSig(appdbi.Spec, "")
+	// }
+
+	// if status.AppDBInstanceSig != "" && status.AppDBInstanceSig != calcParentSig(appdbi.Spec, "") {
+	// 	// AppDBInstance changed, clear out children and start over.
+	// 	myLog(parent, "WARN", fmt.Sprintf("AppDBInstance signature changed, deleting all child resources"))
+	// 	return &status, &desiredChildren, nil
+	// }
+
+	// if appdbi.Spec.Driver.CloudSQLTerraform != nil {
+
+	// 	tfApplyName := fmt.Sprintf("appdb-%s-%s", appdbi.GetName(), parent.GetName())
+
+	// 	if tfapply, ok := children.TerraformApplys[tfApplyName]; ok == true {
+	// 		if status.CloudSQLDB == nil {
+	// 			myLog(parent, "WARN", "Found TerraformPlan in children, but status.CloudSQLDB was nil, re-sync collision.")
+	// 			// Delete TerraformApply and try again
+	// 			desiredTFApplys[tfApplyName] = true
+	// 		} else {
+
+	// 			mySig := calcParentSig(parent.Spec, "")
+	// 			tfapplySig := tfapply.Annotations["appdb-parent-sig"]
+
+	// 			if mySig == tfapplySig {
+
+	// 				status.CloudSQLDB.TFApplyPodName = tfapply.Status.PodName
+
+	// 				if tfapply.Status.PodStatus == "COMPLETED" {
+
+	// 					// Generate secret for DB credentials.
+	// 					if passwordsVar, ok := tfapply.Status.TFOutput["user_passwords"]; ok == true {
+
+	// 						passwords := strings.Split(passwordsVar.Value, ",")
+	// 						if len(parent.Spec.Users) != len(passwords) {
+	// 							myLog(parent, "ERROR", "passwords output from TerraformApply is different length than input users.")
+	// 						} else {
+	// 							status.CredentialsSecrets = make(map[string]string, 0)
+	// 							for i := 0; i < len(parent.Spec.Users); i++ {
+	// 								secretName := fmt.Sprintf("appdb-%s-%s-user-%d", appdbi.GetName(), parent.GetName(), i)
+
+	// 								secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users[i], passwords[i], appdbi.Status.DBHost, appdbi.Status.DBPort)
+
+	// 								status.CredentialsSecrets[parent.Spec.Users[i]] = secretName
+
+	// 								desiredSecrets[secretName] = true
+	// 								desiredChildren = append(desiredChildren, secret)
+	// 							}
+	// 						}
+	// 					} else {
+	// 						myLog(parent, "ERROR", "No user_passwords found in output varibles of TerraformApply status")
+	// 					}
+
+	// 					// Optionally load snapshot from GCS.
+	// 					if parent.Spec.LoadURL != "" {
+	// 						jobName := fmt.Sprintf("appdb-%s-%s-load", appdbi.GetName(), parent.GetName())
+	// 						loadURL := parent.Spec.LoadURL
+	// 						if len(loadURL) >= 5 && loadURL[0:5] != "gs://" {
+	// 							// Relative url to bucket.
+	// 							loadURL = fmt.Sprintf("gs://%s/%s", tfDriverConfig.BackendBucket, parent.Spec.LoadURL)
+	// 						}
+	// 						job := makeLoadJob(jobName, parent.GetNamespace(), appdbi.Status.CloudSQL.InstanceName, loadURL, parent.Spec.DBName, parent.Spec.Users[0], appdbi.Status.CloudSQL.ServiceAccountEmail)
+	// 						if currJob, ok := children.Jobs[job.GetName()]; ok == true {
+	// 							// Wait for load job to complete.
+	// 							if currJob.Status.Succeeded == 1 {
+	// 								// load complete.
+	// 								status.Provisioning = appdbv1.ProvisioningStatusComplete
+	// 							} else if currJob.Status.Failed == *currJob.Spec.BackoffLimit {
+	// 								// Requeue job
+	// 								desiredJobs[job.GetName()] = true
+	// 							}
+	// 						} else {
+	// 							// Create job
+	// 							desiredJobs[job.GetName()] = true
+	// 							desiredChildren = append(desiredChildren, job)
+
+	// 							myLog(parent, "INFO", fmt.Sprintf("Created SQL load job from snapshot %s: %s", loadURL, job.GetName()))
+	// 						}
+	// 					} else {
+	// 						// No load job, so done.
+	// 						status.Provisioning = appdbv1.ProvisioningStatusComplete
+	// 					}
+
+	// 				} else if tfapply.Status.PodStatus == "FAILED" {
+	// 					status.Provisioning = appdbv1.ProvisioningStatusFailed
+
+	// 					// Try again in 60 seconds.
+	// 					tfapplyFishedAtTime, err := time.Parse(time.RFC3339, tfapply.Status.FinishedAt)
+	// 					if err != nil {
+	// 						myLog(parent, "WARN", fmt.Sprintf("Failed to parse tfplan finished at time: %v", err))
+	// 					} else {
+	// 						if time.Since(tfapplyFishedAtTime).Seconds() > 60 {
+	// 							myLog(parent, "INFO", "Retrying TerraformApply")
+	// 							// Setting desiredTFApplys to true will cause it to be omitted during the claim phase, therefore deleting it.
+	// 							desiredTFApplys[tfApplyName] = true
+	// 						}
+	// 					}
+	// 				} else {
+	// 					status.Provisioning = appdbv1.ProvisioningStatusPending
+	// 				}
+	// 			} else {
+	// 				// Patch tfapply with updated spec.
+	// 				myLog(parent, "INFO", fmt.Sprintf("Change detected, patching TerraformApply: %s", tfApplyName))
+
+	// 				tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
+	// 				if err != nil {
+	// 					myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL: %v", err))
+	// 				} else {
+	// 					if _, ok := children.TerraformApplys[tfApplyName]; ok == true {
+	// 						// found existing tfapply, apply changes to it.
+	// 						err = kubectlApply(parent.GetNamespace(), tfApplyName, tfapply)
+	// 						if err != nil {
+	// 							myLog(parent, "ERROR", fmt.Sprintf("Failed to kubectl apply the TerraformApply resource: %v", err))
+	// 						} else {
+
+	// 							status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
+	// 								TFApplyName: tfapply.GetName(),
+	// 								TFApplySig:  calcParentSig(parent.Spec, ""),
+	// 							}
+
+	// 							desiredTFApplys[tfApplyName] = true
+	// 							desiredChildren = append(desiredChildren, tfapply)
+	// 						}
+	// 					} else {
+	// 						myLog(parent, "WARN", "No existing TerraformApply claimed to main changes to.")
+	// 					}
+	// 				}
+	// 			}
+	// 		}
+	// 	} else {
+	// 		// Create new TerraformApply to create DB and users.
+	// 		tfapply, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi)
+	// 		if err != nil {
+	// 			myLog(parent, "ERROR", fmt.Sprintf("Failed to generate TerraformApply spec for CloudSQL DB: %v", err))
+	// 			return &status, &desiredChildren, nil
+	// 		}
+
+	// 		desiredTFApplys[tfApplyName] = true
+	// 		desiredChildren = append(desiredChildren, tfapply)
+
+	// 		myLog(parent, "INFO", fmt.Sprintf("Creating TerraformApply: %s", tfApplyName))
+
+	// 		status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
+	// 			TFApplyName: tfapply.GetName(),
+	// 			TFApplySig:  calcParentSig(parent.Spec, ""),
+	// 		}
+	// 	}
+
+	// 	// Claim new terraformapplys else claim existing.
+	// 	for _, o := range children.TerraformApplys {
+	// 		if desiredTFApplys[o.Name] == false {
+	// 			desiredChildren = append(desiredChildren, o)
+	// 		}
+	// 	}
+
+	// 	// Claim new secrets else claim existing.
+	// 	for _, o := range children.Secrets {
+	// 		if desiredSecrets[o.Name] == false {
+	// 			desiredChildren = append(desiredChildren, o)
+	// 		}
+	// 	}
+
+	// 	// Claim new jobs else claim existing.
+	// 	for _, o := range children.Jobs {
+	// 		if desiredJobs[o.Name] == false {
+	// 			desiredChildren = append(desiredChildren, o)
+	// 		}
+	// 	}
+	// } else {
+	// 	myLog(parent, "WARN", "Unsupported AppDBInstance driver")
+	// }
+
+	// return &status, &desiredChildren, nil
+}
+
+func makeConditionOrder(parent *appdbv1.AppDB) []appdbv1.AppDBConditionType {
+	conditionOrder := make([]appdbv1.AppDBConditionType, 0)
+	for _, c := range conditionStatusOrder {
+		if c == appdbv1.ConditionTypeSnapshotLoadComplete && parent.Spec.LoadURL == "" {
+			// Skip condition.
+			continue
+		}
+		conditionOrder = append(conditionOrder, c)
+	}
+	return conditionOrder
+}
+
+func claimChildIfNotPresnet(name, kind string, newChild interface{}, children *AppDBChildren, desiredChildren *[]interface{}) {
+	// Check to see if item has been created in the children
+	var claimChild interface{}
+	switch kind {
+	case "TerraformApply":
+		if child, ok := children.TerraformApplys[name]; ok == false {
+			claimChild = newChild
+		} else {
+			claimChild = child
+		}
+	case "Secret":
+		if child, ok := children.Secrets[name]; ok == false {
+			claimChild = newChild
+		} else {
+			claimChild = child
+		}
+	case "Job":
+		if child, ok := children.Jobs[name]; ok == false {
+			claimChild = newChild
+		} else {
+			claimChild = child
+		}
+	}
+	*desiredChildren = append(*desiredChildren, claimChild)
+}
+
+func checkConditions(checkType appdbv1.AppDBConditionType, conditions map[appdbv1.AppDBConditionType]*appdbv1.AppDBCondition) error {
+	waiting := []string{}
+
+	for _, conditionType := range conditionDependencies[checkType] {
+		condition := conditions[conditionType]
+		if condition.Status != appdbv1.ConditionTrue {
+			waiting = append(waiting, string(conditionType))
+		}
+	}
+
+	if len(waiting) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Waiting on conditions: %s", strings.Join(waiting, ","))
 }

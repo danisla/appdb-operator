@@ -16,6 +16,10 @@ const (
 	DEFAULT_CLOUD_SQL_DB_SOURCE_PATH = "/config/db/main.tf"
 )
 
+func makeTFApplyName(parent *appdbv1.AppDB, appdbi appdbv1.AppDBInstance) string {
+	return fmt.Sprintf("appdb-%s-%s", appdbi.GetName(), parent.GetName())
+}
+
 func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi appdbv1.AppDBInstance) (tfv1.Terraform, error) {
 	var tfapply tfv1.Terraform
 

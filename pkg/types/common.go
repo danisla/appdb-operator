@@ -4,7 +4,7 @@ package types
 type ProvisioningStatus string
 
 const (
-	ProvisioningStatusPending  = "PENDING"
-	ProvisioningStatusFailed   = "FAILED"
-	ProvisioningStatusComplete = "COMPLETE"
+	ProvisioningStatusPending  ProvisioningStatus = "PENDING"
+	ProvisioningStatusFailed   ProvisioningStatus = "FAILED"
+	ProvisioningStatusComplete ProvisioningStatus = "COMPLETE"
 )

@@ -10,12 +10,12 @@
   version = "v0.26.0"
 
 [[projects]]
-  digest = "1:103a54d02f31eb92c8c271c8f922b466d20a79095231062f308527ab467fac33"
+  digest = "1:70643a4092b128556adfcc7541035319df02d06aedae55245a868c6629a49da5"
   name = "github.com/danisla/terraform-operator"
   packages = ["pkg/types"]
   pruneopts = "UT"
-  revision = "3348243c9fd850377d6febb2f1bd256cf52b47f8"
-  version = "0.3.10"
+  revision = "d3a23c9386582b82c497dde93134c92558e5b72e"
+  version = "0.3.6"
 
 [[projects]]
   digest = "1:2cd7915ab26ede7d95b8749e6b1f933f1c6d5398030684e6505940a10f31cfda"
@@ -124,7 +124,7 @@
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
   pruneopts = "UT"
-  revision = "0709b304e793a5edb4a2c0145f281ecdc20838a4"
+  revision = "0e37d006457bf46f9e6692014ba72ef82c33022c"
 
 [[projects]]
   branch = "master"
@@ -139,18 +139,18 @@
     "idna",
   ]
   pruneopts = "UT"
-  revision = "8a410e7b638dca158bf9e766925842f6651ff828"
+  revision = "26e67e76b6c3f6ce91f7c52def5af501b4e0f3a2"
 
 [[projects]]
   branch = "master"
-  digest = "1:7f4a61b989d94774dc61016b660cf8347f59eb0bed91a10b2f23fc72a38d45d4"
+  digest = "1:374fc90fcb026e9a367e3fad29e988e5dd944b68ca3f24a184d77abc5307dda4"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "ebe1bf3edb3325c393447059974de898d5133eb8"
+  revision = "d0be0721c37eeb5299f245a996a483160fc36940"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"

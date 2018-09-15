@@ -142,11 +142,10 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 						}
 						claimChildIfNotPresnet(tfApplyName, "TerraformApply", tfapply, children, &desiredChildren)
 					} else {
-						// TODO: expose the PodStatus enums to the terraform-operator package
-						if tfapply.Status.PodStatus == "COMPLETED" {
+						if tfapply.Status.PodStatus == tfv1.PodStatusPassed {
 							newStatus = appdbv1.ConditionTrue
 							claimChildIfNotPresnet(tfApplyName, "TerraformApply", tfapply, children, &desiredChildren)
-						} else if tfapply.Status.PodStatus == "FAILED" {
+						} else if tfapply.Status.PodStatus == tfv1.PodStatusFailed {
 							condition.Reason = fmt.Sprintf("TerraformApply/%s pod failed", tfapply.GetName())
 
 							// Try again in 60 seconds.

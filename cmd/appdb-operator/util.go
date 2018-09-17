@@ -37,11 +37,12 @@ func getAppDBInstance(namespace string, name string) (appdbv1.AppDBInstance, err
 	return appdbi, err
 }
 
-func makeCredentialsSecret(name string, namespace string, user string, password string, dbhost string, dbport int32) corev1.Secret {
+func makeCredentialsSecret(name, namespace, user, password, dbname, dbhost string, dbport int32) corev1.Secret {
 	var secret corev1.Secret
 
 	data := make(map[string]string, 0)
 
+	data["dbname"] = dbname
 	data["dbhost"] = dbhost
 	data["dbport"] = fmt.Sprintf("%d", dbport)
 	data["user"] = user

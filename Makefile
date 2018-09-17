@@ -3,7 +3,7 @@ TAG = latest
 all: image
 
 image:
-	gcloud builds submit --config cloudbuild.yaml --project cloud-solutions-group --substitutions=TAG_NAME=$(TAG)
+	gcloud builds submit --config cloudbuild.yaml --project cloud-solutions-group --substitutions=TAG_NAME=$(TAG) --machine-type=n1-highcpu-32
 
 docker-clean:
 	@docker ps --filter status=exited -q | xargs -I {} docker rm {} 2>/dev/null

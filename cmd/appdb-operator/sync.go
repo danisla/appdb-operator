@@ -181,7 +181,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 					for i := 0; i < len(parent.Spec.Users); i++ {
 						secretName := fmt.Sprintf("appdb-%s-%s-user-%d", appdbi.GetName(), parent.GetName(), i)
 
-						secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users[i], passwords[i], appdbi.Status.DBHost, appdbi.Status.DBPort)
+						secret := makeCredentialsSecret(secretName, parent.GetNamespace(), parent.Spec.Users[i], passwords[i], parent.Spec.DBName, appdbi.Status.DBHost, appdbi.Status.DBPort)
 
 						secretNames = append(secretNames, secretName)
 

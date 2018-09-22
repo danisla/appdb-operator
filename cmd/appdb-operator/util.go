@@ -2,21 +2,12 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha1"
-	"encoding/json"
 	"fmt"
-	"log"
 	"os/exec"
 
 	appdbv1 "github.com/danisla/appdb-operator/pkg/types"
 	yaml "github.com/ghodss/yaml"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func myLog(parent *appdbv1.AppDB, level, msg string) {
-	log.Printf("[%s][%s][%s] %s", level, parent.Kind, parent.Name, msg)
-}
 
 func getAppDBInstance(namespace string, name string) (appdbv1.AppDBInstance, error) {
 	var appdbi appdbv1.AppDBInstance
@@ -35,42 +26,4 @@ func getAppDBInstance(namespace string, name string) (appdbv1.AppDBInstance, err
 	err = yaml.Unmarshal(stdout.Bytes(), &appdbi)
 
 	return appdbi, err
-}
-
-func makeCredentialsSecret(name, namespace, user, password, dbname, dbhost string, dbport int32) corev1.Secret {
-	var secret corev1.Secret
-
-	data := make(map[string]string, 0)
-
-	data["dbname"] = dbname
-	data["dbhost"] = dbhost
-	data["dbport"] = fmt.Sprintf("%d", dbport)
-	data["user"] = user
-	data["password"] = password
-
-	secret = corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		StringData: data,
-	}
-
-	return secret
-}
-
-func calcParentSig(spec interface{}, addStr string) string {
-	hasher := sha1.New()
-	data, err := json.Marshal(&spec)
-	if err != nil {
-		log.Printf("[ERROR] Failed to convert parent spec to JSON, this is a bug.\n")
-		return ""
-	}
-	hasher.Write([]byte(data))
-	hasher.Write([]byte(addStr))
-	return fmt.Sprintf("%x", hasher.Sum(nil))
 }

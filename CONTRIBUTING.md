@@ -78,20 +78,6 @@ dep ensure
 skaffold dev
 ```
 
-## Testing
-
-1. Run all tests:
-
-```
-make test
-```
-
-2. Stop tests:
-
-```
-make test-stop
-```
-
 ## Building the release container image
 
 1. Build image using container builder in current project:

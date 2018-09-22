@@ -1,0 +1,9 @@
+apiVersion: ctl.isla.solutions/v1
+kind: AppDB
+metadata:
+  name: app1
+spec:
+  appDBInstance: db1-cloudsql
+  dbName: app1
+  users:
+  - app1-dbuser

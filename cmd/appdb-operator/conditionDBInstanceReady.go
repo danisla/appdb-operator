@@ -10,13 +10,13 @@ func reconcileAppDBIReady(condition *appdbv1.AppDBCondition, parent *appdbv1.App
 	newStatus := appdbv1.ConditionFalse
 	appdbi, err := getAppDBInstance(parent.GetNamespace(), parent.Spec.AppDBInstance)
 	if err == nil {
-		if status.AppDBInstanceSig != "" && status.AppDBInstanceSig != calcParentSig(appdbi.Spec, "") {
+		if status.AppDBInstanceSig != "" && status.AppDBInstanceSig != appdbi.GetSig() {
 			// AppDBInstance spec changed.
 			condition.Reason = fmt.Sprintf("AppDBInstance/%s change detected", appdbi.GetName())
 		} else {
 			if appdbi.Status.Provisioning == appdbv1.ProvisioningStatusComplete {
 				newStatus = appdbv1.ConditionTrue
-				status.AppDBInstanceSig = calcParentSig(appdbi.Spec, "")
+				status.AppDBInstanceSig = appdbi.GetSig()
 			}
 			condition.Reason = fmt.Sprintf("AppDBInstance/%s: %s", appdbi.GetName(), appdbi.Status.Provisioning)
 		}

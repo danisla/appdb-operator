@@ -1,0 +1,21 @@
+apiVersion: ctl.isla.solutions/v1
+kind: AppDBInstance
+metadata:
+  name: db1-cloudsql
+spec:
+  driver:
+    cloudSQLTerraform:
+      params:
+      - name: "region"
+        value: "us-central1"
+      - name: "database_version"
+        value: "MYSQL_5_6"
+      - name: "tier"
+        value: "db-f1-micro"
+      - name: "disk_size_gb"
+        value: "10"
+      - name: "disk_type"
+        value: "PD_SSD"
+      proxy:
+        image: gcr.io/cloudsql-docker/gce-proxy:1.11
+        replicas: 1

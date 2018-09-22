@@ -1,5 +1,8 @@
 TAG = latest
 
+GOOGLE_CREDENTIALS_SA_KEY := $(HOME)/.tf-google-sa-key.json
+GOOGLE_PROVIDER_SECRET_NAME := tf-provider-google
+
 all: image
 
 image:
@@ -25,6 +28,9 @@ lpods:
 	
 metalogs:
 	kubectl -n metacontroller logs --tail=200 -f metacontroller-0
+
+credentials: $(GOOGLE_CREDENTIALS_SA_KEY) project
+	kubectl create secret generic $(GOOGLE_PROVIDER_SECRET_NAME) --from-literal=GOOGLE_PROJECT=$(PROJECT) --from-file=GOOGLE_CREDENTIALS=$(GOOGLE_CREDENTIALS_SA_KEY)
 
 include kaniko.mk
 include test.mk

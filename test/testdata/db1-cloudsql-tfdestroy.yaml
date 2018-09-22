@@ -1,0 +1,16 @@
+apiVersion: ctl.isla.solutions/v1
+kind: TerraformDestroy
+metadata:
+  name: appdbi-db1-cloudsql
+spec:
+  backendBucket: disla-goog-com-csa-ext-appdb-operator
+  backendPrefix: terraform
+  providerConfig:
+    google:
+      secretName: tf-provider-google
+  sources:
+  - tfapply: appdbi-db1-cloudsql
+    tfplan: appdbi-db1-cloudsql
+  tfvarsFrom:
+  - tfplan: appdbi-db1-cloudsql
+    tfapply: appdbi-db1-cloudsql

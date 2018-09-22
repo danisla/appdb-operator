@@ -33,8 +33,6 @@ func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi a
 		return tfapply, fmt.Errorf("Failed to generate tfvars from driver config: %v", err)
 	}
 
-	parentSig := calcParentSig(parent.Spec, "")
-
 	// Create new object.
 	tfapply = appdbv1.Terraform{
 		TypeMeta: metav1.TypeMeta{
@@ -44,9 +42,6 @@ func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi a
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tfApplyName,
 			Namespace: parent.GetNamespace(),
-			Annotations: map[string]string{
-				"appdb-parent-sig": parentSig,
-			},
 		},
 		Spec: tfv1.TerraformSpec{
 			Image:           tfDriverConfig.Image,
@@ -205,4 +200,30 @@ gsutil acl ch -d ${INSTANCE_SA_EMAIL} ${LOAD_URL}
 	} // PodSpec
 
 	return spec
+}
+
+func makeCredentialsSecret(name, namespace, user, password, dbname, dbhost string, dbport int32) corev1.Secret {
+	var secret corev1.Secret
+
+	data := make(map[string]string, 0)
+
+	data["dbname"] = dbname
+	data["dbhost"] = dbhost
+	data["dbport"] = fmt.Sprintf("%d", dbport)
+	data["user"] = user
+	data["password"] = password
+
+	secret = corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		StringData: data,
+	}
+
+	return secret
 }

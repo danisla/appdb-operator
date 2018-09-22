@@ -29,7 +29,7 @@ func reconcileSecretCreated(condition *appdbv1.AppDBCondition, parent *appdbv1.A
 
 				status.CredentialsSecrets[parent.Spec.Users[i]] = secretName
 
-				claimChildAndGetCurrent(secret, children, desiredChildren)
+				children.claimChildAndGetCurrent(secret, desiredChildren)
 
 				newStatus = appdbv1.ConditionTrue
 			}

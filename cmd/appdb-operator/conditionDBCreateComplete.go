@@ -17,45 +17,49 @@ func reconcileDBCreateComplete(condition *appdbv1.AppDBCondition, parent *appdbv
 
 		var ok bool
 		newStatus = appdbv1.ConditionFalse
-		tfApplyName := makeTFApplyName(parent, appdbi)
-		if newChild, err := makeCloudSQLDBTerraform(tfApplyName, parent, appdbi); err != nil {
-			condition.Reason = fmt.Sprintf("Failed to make tfapply: %v", err)
+		tfName := makeTFApplyName(parent, appdbi)
+		kind := "TerraformApply"
+		if newChild, err := makeCloudSQLDBTerraform(tfName, parent, appdbi); err != nil {
+			condition.Reason = fmt.Sprintf("Failed to make %s: %v", kind, err)
 		} else {
-			if tfapply, ok = children.TerraformApplys[tfApplyName]; ok == true {
+			if tfapply, ok = children.TerraformApplys[tfName]; ok == true {
 				// Already created.
 				status.CloudSQLDB = &appdbv1.AppDBCloudSQLDBStatus{
-					TFApplyName:    tfapply.GetName(),
+					TFApplyName:    tfName,
 					TFApplyPodName: tfapply.Status.PodName,
 					TFApplySig:     tfapply.Annotations["appdb-parent-sig"],
 				}
 
-				condition.Reason = fmt.Sprintf("TerraformApply/%s: %s", tfapply.GetName(), tfapply.Status.PodStatus)
+				condition.Reason = fmt.Sprintf("%s/%s: %s", kind, tfName, tfapply.Status.PodStatus)
 
 				if tfapply.Status.PodStatus == tfv1.PodStatusPassed {
 					newStatus = appdbv1.ConditionTrue
-					claimChildAndGetCurrent(newChild, children, desiredChildren)
+					children.claimChildAndGetCurrent(newChild, desiredChildren)
 				} else if tfapply.Status.PodStatus == tfv1.PodStatusFailed {
-					condition.Reason = fmt.Sprintf("TerraformApply/%s pod failed", tfapply.GetName())
+					condition.Reason = fmt.Sprintf("%s/%s pod failed", kind, tfName)
 
 					// Try again in 60 seconds.
 					tfapplyFishedAtTime, err := time.Parse(time.RFC3339, tfapply.Status.FinishedAt)
 					if err != nil {
-						condition.Reason = fmt.Sprintf("Failed to parse tfplan finished at time: %v", err)
+						parent.Log("WARN", fmt.Sprintf("Failed to parse %s finished at time: %v", kind, err))
+						condition.Reason = fmt.Sprintf("%s/%s: Internal error", kind, tfName)
+						children.claimChildAndGetCurrent(newChild, desiredChildren)
 					} else {
 						condition.Message = "Retry in 60 seconds"
 						if time.Since(tfapplyFishedAtTime).Seconds() > 60 {
-							parent.Log("Retrying TerraformApply,%s", tfapply.GetName())
+							parent.Log("Retrying %s/%s", kind, tfName)
+							// Do not claim the new child, this will cause it to be deleted and recreated on the next sync.
 						} else {
-							claimChildAndGetCurrent(newChild, children, desiredChildren)
+							children.claimChildAndGetCurrent(newChild, desiredChildren)
 						}
 					}
 				} else {
 					// Running
-					claimChildAndGetCurrent(newChild, children, desiredChildren)
+					children.claimChildAndGetCurrent(newChild, desiredChildren)
 				}
 			} else {
 				// Not yet created.
-				claimChildAndGetCurrent(newChild, children, desiredChildren)
+				children.claimChildAndGetCurrent(newChild, desiredChildren)
 			}
 		}
 	} else {

@@ -34,3 +34,32 @@ type AppDBInstanceChildren struct {
 	Deployments     map[string]appsv1beta1.Deployment `json:"Deployment.apps/v1beta1"`
 	Secrets         map[string]corev1.Secret          `json:"Secret.v1"`
 }
+
+func (children *AppDBInstanceChildren) claimChildAndGetCurrent(newChild interface{}, desiredChildren *[]interface{}) interface{} {
+	var currChild interface{}
+	switch o := newChild.(type) {
+	case appdbv1.Terraform:
+		if child, ok := children.TerraformPlans[o.GetName()]; ok == true {
+			currChild = child
+		}
+		if child, ok := children.TerraformApplys[o.GetName()]; ok == true {
+			currChild = child
+		}
+	case corev1.Service:
+		if child, ok := children.Services[o.GetName()]; ok == true {
+			currChild = child
+		}
+	case appsv1beta1.Deployment:
+		if child, ok := children.Deployments[o.GetName()]; ok == true {
+			currChild = child
+		}
+	case corev1.Secret:
+		if child, ok := children.Secrets[o.GetName()]; ok == true {
+			currChild = child
+		}
+	}
+
+	*desiredChildren = append(*desiredChildren, newChild)
+
+	return currChild
+}

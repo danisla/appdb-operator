@@ -23,7 +23,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 	tNow := metav1.NewTime(time.Now())
 
 	// Verify required top level fields.
-	if err = verifySpec(parent); err != nil {
+	if err = parent.Spec.Verify(); err != nil {
 		parent.Log("ERROR", "Invalid spec: %v", err)
 		status.Conditions = append(status.Conditions, appdbv1.AppDBCondition{
 			Type:               appdbv1.ConditionTypeAppDBReady,
@@ -37,33 +37,8 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 	}
 
 	// Map of condition types to conditions, converted to list of conditions after switch statement.
-	conditions := make(map[appdbv1.AppDBConditionType]*appdbv1.AppDBCondition, 0)
-	conditionOrder := makeConditionOrder(parent)
-
-	// Extract existing conditions from status and copy to conditions map for easier lookup.
-	for _, c := range conditionOrder {
-		// Search for condition type in conditions.
-		found := false
-		for _, condition := range status.Conditions {
-			if condition.Type == c {
-				found = true
-				condition.LastProbeTime = tNow
-				condition.Reason = ""
-				condition.Message = ""
-				conditions[c] = &condition
-				break
-			}
-		}
-		if found == false {
-			// Initialize condition with unknown state
-			conditions[c] = &appdbv1.AppDBCondition{
-				Type:               c,
-				Status:             appdbv1.ConditionUnknown,
-				LastProbeTime:      tNow,
-				LastTransitionTime: tNow,
-			}
-		}
-	}
+	conditions := parent.MakeConditions(tNow)
+	conditionOrder := parent.GetConditionOrder()
 
 	// Resources used in multiple conditions.
 	var appdbi appdbv1.AppDBInstance
@@ -75,7 +50,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 		newStatus := condition.Status
 
 		// Skip processing conditions with unmet dependencies.
-		if err = checkConditions(conditionType, conditions); err != nil {
+		if err = conditions.CheckConditions(conditionType); err != nil {
 			newStatus = appdbv1.ConditionFalse
 			condition.Reason = err.Error()
 			if condition.Status != newStatus {
@@ -86,7 +61,7 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 		}
 
 		switch conditionType {
-		case appdbv1.ConditionTypeAppDBInstanceReady:
+		case appdbv1.ConditionTypeSpecAppDBInstanceReady:
 			newStatus, appdbi = reconcileAppDBIReady(condition, parent, &status, children, &desiredChildren)
 
 		case appdbv1.ConditionTypeDBCreateComplete:
@@ -109,7 +84,9 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 			}
 			if len(notReady) > 0 {
 				condition.Reason = fmt.Sprintf("Waiting for conditions: %s", strings.Join(notReady, ","))
-				status.Provisioning = appdbv1.ProvisioningStatusPending
+				if status.Provisioning != appdbv1.ProvisioningStatusFailed {
+					status.Provisioning = appdbv1.ProvisioningStatusPending
+				}
 			} else {
 				condition.Reason = "All conditions satisfied"
 				status.Provisioning = appdbv1.ProvisioningStatusComplete
@@ -122,12 +99,8 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 		}
 	}
 
-	// Copy updated conditions back to status in order.
-	newConditions := make([]appdbv1.AppDBCondition, 0)
-	for _, c := range conditionOrder {
-		newConditions = append(newConditions, *conditions[c])
-	}
-	status.Conditions = newConditions
+	// Update status with new conditions.
+	parent.SetConditionStatus(conditions)
 
 	return &status, &desiredChildren, nil
 }

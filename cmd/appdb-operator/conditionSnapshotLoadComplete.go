@@ -20,16 +20,16 @@ func reconcileSnapshotLoadComplete(condition *appdbv1.AppDBCondition, parent *ap
 		if currJob.Status.Succeeded == 1 {
 			// load complete.
 			newStatus = appdbv1.ConditionTrue
-			claimChildAndGetCurrent(job, children, desiredChildren)
+			children.claimChildAndGetCurrent(job, desiredChildren)
 		} else if currJob.Status.Failed == *currJob.Spec.BackoffLimit {
 			// Requeue job
 			parent.Log("INFO", "Recreating SQL Load job")
 		} else {
-			claimChildAndGetCurrent(job, children, desiredChildren)
+			children.claimChildAndGetCurrent(job, desiredChildren)
 		}
 	} else {
 		// Create job
-		claimChildAndGetCurrent(job, children, desiredChildren)
+		children.claimChildAndGetCurrent(job, desiredChildren)
 		parent.Log("INFO", "Created SQL load job from snapshot %s: %s", loadURL, job.GetName())
 	}
 

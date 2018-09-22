@@ -20,6 +20,10 @@ const (
 	DEFAULT_CLOUD_SQL_DISK_TYPE   = "PD_SSD"
 )
 
+func makeTFName(parent *appdbv1.AppDBInstance) string {
+	return fmt.Sprintf("appdbi-%s", parent.Name)
+}
+
 func makeCloudSQLTerraform(tfApplyName string, parent *appdbv1.AppDBInstance) (tfv1.Terraform, error) {
 	var tfapply tfv1.Terraform
 
@@ -33,8 +37,6 @@ func makeCloudSQLTerraform(tfApplyName string, parent *appdbv1.AppDBInstance) (t
 		return tfapply, fmt.Errorf("Failed to generate tfvars from driver config: %v", err)
 	}
 
-	parentSig := calcParentSig(parent.Spec, "")
-
 	tfapply = tfv1.Terraform{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "ctl.isla.solutions/v1",
@@ -43,9 +45,6 @@ func makeCloudSQLTerraform(tfApplyName string, parent *appdbv1.AppDBInstance) (t
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tfApplyName,
 			Namespace: parent.GetNamespace(),
-			Annotations: map[string]string{
-				"appdb-parent-sig": parentSig,
-			},
 		},
 		Spec: tfv1.TerraformSpec{
 			Image:           tfDriverConfig.Image,

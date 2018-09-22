@@ -33,23 +33,24 @@ type AppDBChildren struct {
 	Jobs            map[string]batchv1.Job    `json:"Job.batch/v1"`
 }
 
-// Order of condition status
-var conditionStatusOrder = []appdbv1.AppDBConditionType{
-	appdbv1.ConditionTypeAppDBInstanceReady,
-	appdbv1.ConditionTypeDBCreateComplete,
-	appdbv1.ConditionTypeCredentialsSecretCreated,
-	appdbv1.ConditionTypeSnapshotLoadComplete,
-	appdbv1.ConditionTypeAppDBReady,
-}
+func (children *AppDBChildren) claimChildAndGetCurrent(newChild interface{}, desiredChildren *[]interface{}) interface{} {
+	var currChild interface{}
+	switch o := newChild.(type) {
+	case appdbv1.Terraform:
+		if child, ok := children.TerraformApplys[o.GetName()]; ok == true {
+			currChild = child
+		}
+	case corev1.Secret:
+		if child, ok := children.Secrets[o.GetName()]; ok == true {
+			currChild = child
+		}
+	case appdbv1.Job:
+		if child, ok := children.Jobs[o.GetName()]; ok == true {
+			currChild = child
+		}
+	}
 
-var conditionDependencies = map[appdbv1.AppDBConditionType][]appdbv1.AppDBConditionType{
-	appdbv1.ConditionTypeDBCreateComplete: []appdbv1.AppDBConditionType{
-		appdbv1.ConditionTypeAppDBInstanceReady,
-	},
-	appdbv1.ConditionTypeCredentialsSecretCreated: []appdbv1.AppDBConditionType{
-		appdbv1.ConditionTypeDBCreateComplete,
-	},
-	appdbv1.ConditionTypeSnapshotLoadComplete: []appdbv1.AppDBConditionType{
-		appdbv1.ConditionTypeCredentialsSecretCreated,
-	},
+	*desiredChildren = append(*desiredChildren, newChild)
+
+	return currChild
 }

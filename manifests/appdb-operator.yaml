@@ -28,12 +28,20 @@ spec:
     resource: secrets
   - apiVersion: v1
     resource: services
+    updateStrategy:
+      method: InPlace
   - apiVersion: apps/v1beta1
     resource: deployments
+    updateStrategy:
+      method: InPlace
   - apiVersion: ctl.isla.solutions/v1
     resource: terraformapplys
+    updateStrategy:
+      method: InPlace
   - apiVersion: ctl.isla.solutions/v1
     resource: terraformplans
+    updateStrategy:
+      method: InPlace
   hooks:
     sync:
       webhook:

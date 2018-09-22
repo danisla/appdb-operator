@@ -70,10 +70,16 @@ spec:
     resource: secrets
   - apiVersion: batch/v1
     resource: jobs
+    updateStrategy:
+      method: InPlace
   - apiVersion: ctl.isla.solutions/v1
     resource: terraformapplys
+    updateStrategy:
+      method: InPlace
   - apiVersion: ctl.isla.solutions/v1
     resource: terraformplans
+    updateStrategy:
+      method: InPlace
   hooks:
     sync:
       webhook:

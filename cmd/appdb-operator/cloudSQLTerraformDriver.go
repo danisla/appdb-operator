@@ -20,8 +20,8 @@ func makeTFApplyName(parent *appdbv1.AppDB, appdbi appdbv1.AppDBInstance) string
 	return fmt.Sprintf("appdb-%s-%s", appdbi.GetName(), parent.GetName())
 }
 
-func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi appdbv1.AppDBInstance) (tfv1.Terraform, error) {
-	var tfapply tfv1.Terraform
+func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi appdbv1.AppDBInstance) (appdbv1.Terraform, error) {
+	var tfapply appdbv1.Terraform
 
 	manifest, err := getCloudSQLTerraformManifest(DEFAULT_CLOUD_SQL_DB_SOURCE_PATH)
 	if err != nil {
@@ -36,7 +36,7 @@ func makeCloudSQLDBTerraform(tfApplyName string, parent *appdbv1.AppDB, appdbi a
 	parentSig := calcParentSig(parent.Spec, "")
 
 	// Create new object.
-	tfapply = tfv1.Terraform{
+	tfapply = appdbv1.Terraform{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "ctl.isla.solutions/v1",
 			Kind:       "TerraformApply",
@@ -94,8 +94,8 @@ func makeTFVars(instance string, dbname string, users []string) (map[string]stri
 	return tfvars, nil
 }
 
-func makeLoadJob(jobName, namespace, instanceName, snapshotURI, dbname, user, saEmail string) batchv1.Job {
-	var job batchv1.Job
+func makeLoadJob(jobName, namespace, instanceName, snapshotURI, dbname, user, saEmail string) appdbv1.Job {
+	var job appdbv1.Job
 
 	var parallelism int32 = 1
 	var completions int32 = 1
@@ -104,7 +104,7 @@ func makeLoadJob(jobName, namespace, instanceName, snapshotURI, dbname, user, sa
 
 	podSpec := makeLoadJobPodSpec(instanceName, snapshotURI, dbname, user, saEmail)
 
-	job = batchv1.Job{
+	job = appdbv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "batch/v1",
 			Kind:       "Job",

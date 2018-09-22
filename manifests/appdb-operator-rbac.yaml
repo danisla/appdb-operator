@@ -23,9 +23,6 @@ metadata:
   name: appdb-operator
   namespace: metacontroller
 rules:
-- apiGroups: [""] # "" indicates the core API group
-  resources: ["configmaps", "secrets"]
-  verbs: ["get", "list"]
 - apiGroups: ["ctl.isla.solutions"]
   resources: ["*"]
   verbs: ["*"]

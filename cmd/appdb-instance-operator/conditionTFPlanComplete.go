@@ -15,6 +15,10 @@ func reconcileTFPlanComplete(condition *appdbv1.AppDBInstanceCondition, parent *
 	tfName := makeTFName(parent)
 	kind := "TerraformPlan"
 
+	if status.CloudSQL == nil {
+		status.CloudSQL = &appdbv1.AppDBInstanceCloudSQLStatus{}
+	}
+
 	if newChild, err := makeCloudSQLTerraform(tfName, parent); err != nil {
 		condition.Reason = fmt.Sprintf("Failed to make %s: %v", kind, err)
 	} else {
@@ -57,9 +61,13 @@ func reconcileTFPlanComplete(condition *appdbv1.AppDBInstanceCondition, parent *
 				}
 			} else if tfplan.Status.PodStatus == tfv1.PodStatusFailed {
 				status.Provisioning = appdbv1.ProvisioningStatusFailed
+				children.claimChildAndGetCurrent(newChild, desiredChildren)
+			} else {
+				children.claimChildAndGetCurrent(newChild, desiredChildren)
 			}
 		} else {
 			// Not yet created.
+			parent.Log("INFO", "Creating new %s/%s", kind, tfName)
 			children.claimChildAndGetCurrent(newChild, desiredChildren)
 		}
 	}

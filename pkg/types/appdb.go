@@ -173,15 +173,6 @@ func (parent *AppDB) GetConditionOrder() []AppDBConditionType {
 	return conditionOrder
 }
 
-// SetConditionStatus sets the ordered condition status from the conditions map.
-func (parent *AppDB) SetConditionStatus(conditions AppDBConditions) {
-	newConditions := make([]AppDBCondition, 0)
-	for _, c := range parent.GetConditionOrder() {
-		newConditions = append(newConditions, *conditions[c])
-	}
-	parent.Status.Conditions = newConditions
-}
-
 // AppDBSpec is the top level structure of the spec body
 type AppDBSpec struct {
 	AppDBInstance string   `json:"appDBInstance,omitempty"`

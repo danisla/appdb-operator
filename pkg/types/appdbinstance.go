@@ -73,43 +73,29 @@ func (parent *AppDBInstance) MakeConditions(initTime metav1.Time) AppDBInstanceC
 // This is dependent on which fields are provided in the parent spec.
 func (parent *AppDBInstance) GetConditionOrder() []AppDBInstanceConditionType {
 	desiredOrder := []AppDBInstanceConditionType{
+		ConditionTypeAppDBInstanceTFPlanComplete,
+		ConditionTypeAppDBInstanceTFApplyComplete,
+		ConditionTypeAppDBInstanceCloudSQLProxyReady,
 		ConditionTypeAppDBInstanceReady,
 	}
 
 	conditionOrder := make([]AppDBInstanceConditionType, 0)
 	for _, c := range desiredOrder {
-		if c == ConditionTypeAppDBInstanceUpdatedTFPlanComplete {
-			// Only add if parent has changed.
-			if parent.Status.CloudSQL != nil && parent.Status.CloudSQL.LastPlanSig != "" {
-				if parent.Status.CloudSQL.LastPlanSig == parent.GetSig() {
-					continue
-				}
-			}
+		if parent.Spec.Driver.CloudSQLTerraform == nil && (c == ConditionTypeAppDBInstanceTFPlanComplete || c == ConditionTypeAppDBInstanceTFApplyComplete) {
+			// Skip Terraform driver conditions
+			continue
 		}
 		conditionOrder = append(conditionOrder, c)
 	}
 	return conditionOrder
 }
 
-// SetConditionStatus sets the ordered condition status from the conditions map.
-func (parent *AppDBInstance) SetConditionStatus(conditions AppDBInstanceConditions) {
-	newConditions := make([]AppDBInstanceCondition, 0)
-	for _, c := range parent.GetConditionOrder() {
-		if parent.Spec.Driver.CloudSQLTerraform == nil && (c == ConditionTypeAppDBInstanceTFPlanComplete || c == ConditionTypeAppDBInstanceTFApplyComplete) {
-			// Skip Terraform driver conditions
-			continue
-		}
-		newConditions = append(newConditions, *conditions[c])
-	}
-	parent.Status.Conditions = newConditions
-}
-
 // AppDBInstanceOperatorStatus is the status structure for the custom resource
 type AppDBInstanceOperatorStatus struct {
-	Provisioning ProvisioningStatus           `json:"provisioning"`
-	DBHost       string                       `json:"dbHost"`
-	DBPort       int32                        `json:"dbPort"`
-	CloudSQL     *AppDBInstanceCloudSQLStatus `json:"cloudSQL"`
+	Provisioning ProvisioningStatus           `json:"provisioning,omitempty"`
+	DBHost       string                       `json:"dbHost,omitempty"`
+	DBPort       int32                        `json:"dbPort,omitempty"`
+	CloudSQL     *AppDBInstanceCloudSQLStatus `json:"cloudSQL,omitempty"`
 	Conditions   []AppDBInstanceCondition     `json:"conditions,omitempty"`
 }
 
@@ -117,7 +103,6 @@ type AppDBInstanceOperatorStatus struct {
 func (status *AppDBInstanceOperatorStatus) GetConditionOrder() []AppDBInstanceConditionType {
 	return []AppDBInstanceConditionType{
 		ConditionTypeAppDBInstanceTFPlanComplete,
-		ConditionTypeAppDBInstanceUpdatedTFPlanComplete,
 		ConditionTypeAppDBInstanceTFApplyComplete,
 		ConditionTypeAppDBInstanceCloudSQLProxyReady,
 		ConditionTypeAppDBInstanceReady,
@@ -146,8 +131,6 @@ type AppDBInstanceConditionType string
 const (
 	// ConditionTypeAppDBInstanceTFPlanComplete is True when the TerraformPlan has completed successfully.
 	ConditionTypeAppDBInstanceTFPlanComplete AppDBInstanceConditionType = "TerraformPlanComplete"
-	// ConditionTypeAppDBInstanceUpdatedTFPlanComplete is True when the TerraformPlan for updated spec has completed successfully.
-	ConditionTypeAppDBInstanceUpdatedTFPlanComplete AppDBInstanceConditionType = "TerraformPlanUpdateComplete"
 	// ConditionTypeAppDBInstanceTFApplyComplete is True when the TerraformApply has completed successfully.
 	ConditionTypeAppDBInstanceTFApplyComplete AppDBInstanceConditionType = "TerraformApplyComplete"
 	// ConditionTypeAppDBInstanceCloudSQLProxyReady is True when the Cloud SQL Proxy has been created and all replicas are available.

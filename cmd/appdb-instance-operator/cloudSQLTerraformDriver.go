@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -32,10 +31,7 @@ func makeCloudSQLTerraform(tfApplyName string, parent *appdbv1.AppDBInstance) (t
 		return tfapply, fmt.Errorf("Error loading cloud sql terraform manifest from %s: %v", DEFAULT_CLOUD_SQL_SOURCE_PATH, err)
 	}
 
-	tfvars, err := makeTFVars(tfApplyName, parent.Spec.Driver.CloudSQLTerraform)
-	if err != nil {
-		return tfapply, fmt.Errorf("Failed to generate tfvars from driver config: %v", err)
-	}
+	tfvars := makeTFVars(tfApplyName, parent.Spec.Driver.CloudSQLTerraform)
 
 	tfapply = tfv1.Terraform{
 		TypeMeta: metav1.TypeMeta{
@@ -80,30 +76,20 @@ func getCloudSQLTerraformManifest(srcPath string) (string, error) {
 	return string(manifest), err
 }
 
-func makeTFVars(name string, cfg *appdbv1.AppDBCloudSQLTerraformDriver) (map[string]string, error) {
+func makeTFVars(name string, cfg *appdbv1.AppDBCloudSQLTerraformDriver) map[string]string {
+	// This method is deprecated because creates a map[string]string from the spec tf vars.
+	// Remove once the terraform-operator has been updated to support a list of key-value structs instead of map for json stability.
 	var tfvars = make(map[string]string, 0)
 
 	// Names must be unique and cannot be reused across destroys.
 	// the Terraform source will create a new name using this as a prefix.
 	tfvars["name"] = name
 
-	// Marshal params to json and unmarshal as tfvars
-	data, err := json.Marshal(cfg.Params)
-	if err != nil {
-		return tfvars, err
+	for _, p := range cfg.Params {
+		tfvars[p.Name] = p.Value
 	}
 
-	var paramsJSON map[string]string
-	err = json.Unmarshal(data, &paramsJSON)
-	if err != nil {
-		return tfvars, err
-	}
-
-	for k, v := range paramsJSON {
-		tfvars[k] = v
-	}
-
-	return tfvars, nil
+	return tfvars
 }
 
 func makeCloudSQLProxy(parent *appdbv1.AppDBInstance, tfapply tfv1.Terraform) (corev1.Secret, appsv1beta1.Deployment, corev1.Service, error) {

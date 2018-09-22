@@ -99,8 +99,12 @@ func sync(parentType ParentType, parent *appdbv1.AppDB, children *AppDBChildren)
 		}
 	}
 
-	// Update status with new conditions.
-	parent.SetConditionStatus(conditions)
+	// Set the ordered condition status from the conditions map.
+	newConditions := make([]appdbv1.AppDBCondition, 0)
+	for _, c := range parent.GetConditionOrder() {
+		newConditions = append(newConditions, *conditions[c])
+	}
+	status.Conditions = newConditions
 
 	return &status, &desiredChildren, nil
 }

@@ -126,8 +126,9 @@ func reconcileTFApplyComplete(condition *appdbv1.AppDBInstanceCondition, parent 
 				children.claimChildAndGetCurrent(newChild, desiredChildren)
 			}
 		} else {
-			// Create after TerraformPlan completes.
+			// Create new child after TerraformPlan completes.
 			if status.CloudSQL != nil && status.CloudSQL.TFPlanStatus == tfv1.PodStatusPassed {
+				parent.Log("INFO", "Creating new %s/%s", kind, tfName)
 				children.claimChildAndGetCurrent(newChild, desiredChildren)
 			}
 		}

@@ -33,4 +33,3 @@ credentials: $(GOOGLE_CREDENTIALS_SA_KEY) project
 	kubectl create secret generic $(GOOGLE_PROVIDER_SECRET_NAME) --from-literal=GOOGLE_PROJECT=$(PROJECT) --from-file=GOOGLE_CREDENTIALS=$(GOOGLE_CREDENTIALS_SA_KEY)
 
 include kaniko.mk
-include test.mk

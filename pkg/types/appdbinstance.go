@@ -99,16 +99,6 @@ type AppDBInstanceOperatorStatus struct {
 	Conditions   []AppDBInstanceCondition     `json:"conditions,omitempty"`
 }
 
-// GetConditionOrder returns an ordered slice of the conditions as the should appear in the status.
-func (status *AppDBInstanceOperatorStatus) GetConditionOrder() []AppDBInstanceConditionType {
-	return []AppDBInstanceConditionType{
-		ConditionTypeAppDBInstanceTFPlanComplete,
-		ConditionTypeAppDBInstanceTFApplyComplete,
-		ConditionTypeAppDBInstanceCloudSQLProxyReady,
-		ConditionTypeAppDBInstanceReady,
-	}
-}
-
 // AppDBInstanceCondition defines the format for a status condition element.
 type AppDBInstanceCondition struct {
 	Type               AppDBInstanceConditionType `json:"type"`
